@@ -1,0 +1,1153 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trefaset vekselstrøm</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: måleopstilling. Et bredt "scope" (viserdiagram + kurver side om side) med målepanelet ved siden af; teori og opgaver nedenunder. */
+:root{
+  --bg:#ECEFF2; --panel:#FFFFFF; --panel-2:#F3F5F8; --ink:#13171C; --muted:#5A6572;
+  --line:#D2D8DF; --grid:#E5E9EE; --axis:#97A1AC;
+  --good:#1D7A4C; --good-bg:#E2F2E9; --bad:#B3321E; --bad-bg:#FBE8E4;
+  /* Ledningsfarver: L1 brun, L2 sort, L3 grå, N blå */
+  --l1:#8B5A2B; --l2:#1C1C1E; --l3:#8D939A; --n:#2B7BC0; --combo:#C2185B;
+  --font-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --font-body:"Barlow","Segoe UI",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --fs:15px; --H:clamp(240px,24vw,400px);
+}
+:root[data-palette="contrast"]{--l1:#C4532A; --l2:#2460C8; --l3:#1E8F62; --n:#7A4CC2}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1216; --panel:#161B21; --panel-2:#1C222A; --ink:#E5E9EE; --muted:#93A0AD;
+    --line:#2A323C; --grid:#20272F; --axis:#5A6571;
+    --good:#5CC48D; --good-bg:#14301F; --bad:#FF7B62; --bad-bg:#3A1D17;
+    --l1:#CC9560; --l2:#ECE9E3; --l3:#8B929A; --n:#5AA6E6; --combo:#FF5A99;
+    color-scheme:dark;
+  }
+  :root:not([data-theme="light"])[data-palette="contrast"]{--l1:#F2804F; --l2:#71A0FF; --l3:#40C792; --n:#AE8DF2}
+}
+:root[data-theme="dark"]{
+  --bg:#0E1216; --panel:#161B21; --panel-2:#1C222A; --ink:#E5E9EE; --muted:#93A0AD;
+  --line:#2A323C; --grid:#20272F; --axis:#5A6571;
+  --good:#5CC48D; --good-bg:#14301F; --bad:#FF7B62; --bad-bg:#3A1D17;
+  --l1:#CC9560; --l2:#ECE9E3; --l3:#8B929A; --n:#5AA6E6; --combo:#FF5A99;
+  color-scheme:dark;
+}
+:root[data-theme="dark"][data-palette="contrast"]{--l1:#F2804F; --l2:#71A0FF; --l3:#40C792; --n:#AE8DF2}
+:root.big{--fs:18px; --H:clamp(280px,30vw,540px)}
+
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:var(--fs);line-height:1.5}
+button{font:inherit;color:inherit;cursor:pointer}
+button:disabled{cursor:default;opacity:.4}
+:focus-visible{outline:2px solid var(--combo);outline-offset:2px}
+sub{font-size:.72em;line-height:0}
+.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.wrap{max-width:1500px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:18px 40px;display:grid;gap:18px}
+
+/* Hoved */
+.top{display:flex;flex-wrap:wrap;gap:14px 28px;align-items:flex-end;justify-content:space-between}
+.brand{min-width:0}
+.eyebrow{font-family:var(--font-mono);font-size:.76rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 4px}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(2rem, 1.3rem + 2.4vw, 3rem);line-height:.95;letter-spacing:.01em;text-transform:uppercase;margin:0;text-wrap:balance}
+.lead{margin:8px 0 0;color:var(--muted);max-width:64ch}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.hero-scope{height:120px;width:auto;max-width:100%;flex:none;align-self:center}
+@media (max-width:640px){.hero-scope{height:90px}}
+.tool-btns{display:flex;flex-wrap:wrap;gap:6px}
+
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:2px;gap:2px}
+.seg button{border:0;background:transparent;padding:4px 10px;border-radius:6px;font-weight:600;color:var(--muted);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--panel)}
+.seg-lg button{padding:7px 16px;font-family:var(--font-display);font-size:1.12rem;letter-spacing:.04em;text-transform:uppercase}
+.ghost{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:5px 11px;font-weight:500}
+.ghost[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.btn-primary{border:0;background:var(--ink);color:var(--panel);border-radius:8px;padding:7px 14px;font-weight:600;min-width:7em}
+
+/* Scope + panel */
+.bench{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
+@media (min-width:1180px){.bench{grid-template-columns:minmax(0,1fr) 380px;align-items:start}}
+.scope{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:12px;min-width:0;scroll-margin-top:12px}
+.canvases{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+#pWrap{flex:0 0 var(--H);height:var(--H);max-width:100%}
+#wWrap{flex:1 1 360px;height:var(--H);min-width:0}
+canvas{display:block;width:100%;height:100%;touch-action:pan-y}
+#cvW{cursor:ew-resize;border-radius:6px}
+.transport{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.range-wrap{flex:1 1 180px;display:flex;min-width:140px}
+.range-wrap input{width:100%;accent-color:var(--ink)}
+#timeOut{min-width:13em;font-size:.92em}
+.sel{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:.9em}
+select,input[type="number"]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 11px 3px 8px;font-size:.9em;cursor:pointer;user-select:none}
+.chip input{margin:0;accent-color:var(--ink)}
+.chip:has(input:not(:checked)){opacity:.5}
+.dot{width:.78em;height:.78em;border-radius:50%;background:var(--c);display:inline-block;flex:none;box-shadow:0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent)}
+.readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px}
+.ro{background:var(--panel-2);border-radius:8px;padding:6px 10px;display:grid}
+.ro-l{font-size:.82em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.ro-v{font-size:1.05em;font-weight:500}
+.hint{margin:0;color:var(--muted);font-size:.88em}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:grid;min-width:0}
+.pan-sec{padding:14px 16px;display:grid;gap:10px;min-width:0}
+.pan-sec:not([hidden]) ~ .pan-sec{border-top:1px solid var(--line)}
+.pan-sec h2{font-family:var(--font-display);font-weight:600;font-size:1.08rem;letter-spacing:.06em;text-transform:uppercase;margin:0}
+.pan-sec p{margin:0}
+.field{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.field input{width:5.5em;text-align:right}
+.derived{font-size:.88em;color:var(--muted)}
+
+.pt-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.pt-tag{display:inline-grid;place-items:center;width:1.75em;height:1.75em;border-radius:50%;background:var(--ink);color:var(--panel);font-weight:700;font-family:var(--font-display);font-size:.95em;flex:none}
+.icon-btn{border:1px solid var(--line);background:transparent;border-radius:6px;width:2em;height:2em;line-height:1;color:var(--muted)}
+.examples{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.88em;color:var(--muted)}
+.examples .ghost{padding:2px 9px}
+.op-note{font-size:.86em;color:var(--muted)}
+
+.ptls{display:grid;gap:6px}
+.ptl{display:flex;gap:8px;align-items:center;font-size:.92em;line-height:1.35}
+.verdict{border-radius:10px;padding:10px 12px;display:grid;gap:7px}
+.verdict.bad{background:var(--bad-bg)}
+.verdict.good{background:var(--good-bg)}
+.verdict.info{background:var(--panel-2)}
+.badge{justify-self:start;font-weight:700;font-size:.76em;letter-spacing:.07em;text-transform:uppercase;padding:2px 9px;border-radius:999px}
+.bad .badge{background:var(--bad);color:var(--panel)}
+.good .badge{background:var(--good);color:var(--panel)}
+.strike{text-decoration:line-through;text-decoration-color:var(--bad);text-decoration-thickness:2px}
+.formula{font-family:var(--font-mono);font-size:.94em}
+.key{font-family:var(--font-mono);font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.tile{background:var(--panel-2);border-radius:8px;padding:7px 9px;display:grid;gap:2px;align-content:start}
+.verdict .tile{background:var(--panel)}
+.t-l{font-size:.74em;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);line-height:1.2}
+.t-l span{display:block;text-transform:none;letter-spacing:0}
+.t-v{font-size:1.14em;font-weight:600;color:var(--c, var(--ink));white-space:nowrap}
+.t-v small{font-size:.7em;color:var(--muted);font-weight:500}
+.pill{justify-self:start;padding:3px 10px;border-radius:999px;font-weight:600;font-size:.88em;background:var(--good-bg);color:var(--good)}
+
+.load{display:grid;gap:4px;padding-block:4px}
+.load + .load{border-top:1px dashed var(--line);padding-top:8px}
+.load-h{display:flex;align-items:center;gap:8px}
+.load-h output{margin-left:auto;font-weight:600}
+.slider{display:grid;grid-template-columns:7.2em minmax(0,1fr);align-items:center;gap:8px;font-size:.88em;color:var(--muted)}
+.slider input{accent-color:var(--c);width:100%;min-width:0}
+.phi-out{font-size:.84em;color:var(--muted);text-align:right}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets .ghost{font-size:.88em;padding:3px 9px}
+
+/* Teori og opgaver */
+.learn{display:grid;gap:18px 32px;grid-template-columns:minmax(0,1fr);padding-top:6px}
+@media (min-width:1000px){.learn{grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}}
+.learn h2{font-family:var(--font-display);font-weight:700;text-transform:uppercase;letter-spacing:.04em;font-size:1.4rem;margin:0 0 10px}
+.theory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px 24px}
+.theory article{min-width:0}
+.theory h3{font-family:var(--font-display);font-weight:600;font-size:1.15rem;letter-spacing:.02em;margin:0 0 4px}
+.theory p{margin:0 0 8px;max-width:62ch}
+.eq{font-family:var(--font-mono);font-size:.9em;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 11px;display:grid;gap:2px;overflow-x:auto}
+/* Ligninger og udtryk deles aldrig over to linjer; er der ikke plads, kan blokken scrolles */
+.eq > span,.formula,.key{white-space:nowrap}
+.formula,.key{overflow-x:auto}
+.task-list{margin:0;padding-left:1.4em;display:grid;gap:14px}
+.task-list p{margin:0 0 6px}
+.task-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+details summary{cursor:pointer;color:var(--muted);font-weight:600}
+details p{margin:6px 0 0}
+.foot{color:var(--muted);font-size:.85em;border-top:1px solid var(--line);padding-top:12px;margin:0}
+</style>
+<link rel="stylesheet" href="install.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="brand">
+    <p class="eyebrow">230/400 V · 50 Hz · L1 L2 L3 N + PE (PEN)</p>
+    <h1>Trefaset vekselstrøm</h1>
+    <p class="lead">Tre faser forskudt 120°. Sæt to punkter på kurvernes toppe og se, hvorfor spændingen mellem to faser er 400 V og ikke 460 V.</p>
+  </div>
+  <img class="hero-scope" src="oscilloskop.webp" width="198" height="120" alt="Digitalt oscilloskop">
+  <div class="toolbar">
+    <div class="seg seg-lg" role="group" aria-label="Vælg størrelse" id="modeSeg">
+      <button type="button" id="modeU" aria-pressed="true">Spænding U</button>
+      <button type="button" id="modeI" aria-pressed="false">Strøm I</button>
+    </div>
+    <div class="tool-btns">
+      <button type="button" id="palBtn" class="ghost">Farver: ledning</button>
+      <button type="button" id="bigBtn" class="ghost" aria-pressed="false">Projektor</button>
+      <button type="button" id="themeBtn" class="ghost">Mørkt tema</button>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Del af værktøjet">
+  <button type="button" role="tab" id="tabTheory" aria-selected="true" aria-controls="viewTheory">Grundteori</button>
+  <button type="button" role="tab" id="tabInstall" aria-selected="false" aria-controls="viewInstall">Installation</button>
+  <button type="button" role="tab" id="tabDocs" aria-selected="false" aria-controls="viewDocs">Vejledning</button>
+</nav>
+
+<div id="viewTheory" role="tabpanel" aria-labelledby="tabTheory">
+<main class="bench">
+  <section class="scope" id="scope" aria-label="Viserdiagram og kurver">
+    <div class="canvases">
+      <div id="pWrap"><canvas id="cvP" role="img" aria-label="Roterende viserdiagram"></canvas></div>
+      <div id="wWrap"><canvas id="cvW" tabindex="0" role="img" aria-label="Kurver over tid. Klik på en top for at sætte et punkt. Træk eller brug piletasterne for at flytte tidsmarkøren."></canvas></div>
+    </div>
+    <div class="transport">
+      <button type="button" id="playBtn" class="btn-primary" aria-pressed="false">&#9654;&#xFE0E; Afspil</button>
+      <button type="button" id="stepBack" class="ghost" aria-label="15 grader tilbage">−15°</button>
+      <button type="button" id="stepFwd" class="ghost" aria-label="15 grader frem">+15°</button>
+      <label class="range-wrap"><span class="sr">Tidsmarkør</span><input type="range" id="thetaRange" min="0" max="720" step="1" value="60"></label>
+      <output id="timeOut" class="num"></output>
+      <label class="sel">Tempo
+        <select id="speedSel">
+          <option value="0.1">1 periode = 10 s</option>
+          <option value="0.25" selected>1 periode = 4 s</option>
+          <option value="0.5">1 periode = 2 s</option>
+          <option value="1">1 periode = 1 s</option>
+        </select>
+      </label>
+      <label class="sel">Vis
+        <select id="perSel">
+          <option value="1">1 periode (20 ms)</option>
+          <option value="2">2 perioder (40 ms)</option>
+        </select>
+      </label>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="readouts" id="readouts"></div>
+    <p class="hint">Klik på en top (○) for at sætte punkt A og B. Klik på et punkt igen for at fjerne det. Træk i kurverne eller brug ← → for at flytte tidsmarkøren, og mellemrum for at afspille. <button type="button" class="link" data-doc="doc-trefase">Læs mere i vejledningen</button></p>
+  </section>
+
+  <aside class="panel">
+    <section class="pan-sec" data-mode="U">
+      <h2>Netspænding</h2>
+      <label class="field"><span>Fasespænding U (L–N)</span><span><input type="number" id="uIn" min="1" max="1000" step="1" value="230"> V</span></label>
+      <p class="derived num" id="uDerived"></p>
+    </section>
+    <section class="pan-sec" data-mode="I">
+      <h2>Belastning</h2>
+      <div class="presets" id="presets"></div>
+      <div id="loads"></div>
+    </section>
+    <section class="pan-sec">
+      <h2>To punkter</h2>
+      <div id="ptEditor"></div>
+      <div class="examples" id="examples"></div>
+      <div data-mode="I">
+        <div class="seg" role="group" aria-label="Hvordan A og B kombineres" id="opSeg">
+          <button type="button" data-op="sum">Sum A + B</button>
+          <button type="button" data-op="diff">Differens A − B</button>
+        </div>
+        <p class="op-note" id="opNote"></p>
+      </div>
+    </section>
+    <section class="pan-sec" id="result" aria-live="polite"></section>
+    <section class="pan-sec" data-mode="I" id="neutralCard"></section>
+  </aside>
+</main>
+
+<section class="learn">
+  <div class="theory">
+    <h2>Teori i korte træk</h2>
+    <div class="theory-grid">
+      <article>
+        <h3>Hvorfor 120°?</h3>
+        <p>Generatoren har tre spoler fordelt jævnt rundt i statoren. 360° delt med 3 giver 120°. L2 når derfor sin top 120° (6,67 ms) efter L1, og L3 når sin top 120° efter L2.</p>
+        <div class="eq"><span>u<sub>1</sub> = Û · sin(ωt)</span><span>u<sub>2</sub> = Û · sin(ωt − 120°)</span><span>u<sub>3</sub> = Û · sin(ωt − 240°)</span></div>
+      </article>
+      <article>
+        <h3>RMS, peak og peak-peak</h3>
+        <p>Når vi siger 230 V, mener vi effektivværdien (RMS). Det er den jævnspænding, der ville give samme varme i en modstand. Selve kurven svinger højere op og længere ned.</p>
+        <div class="eq"><span>Û = √2 · U = √2 · 230 V ≈ 325 V</span><span>U<sub>pp</sub> = 2 · Û ≈ 650 V</span></div>
+      </article>
+      <article>
+        <h3>Hvorfor 400 V og ikke 460 V?</h3>
+        <p>Spændingen mellem L1 og L2 er forskellen i samme øjeblik: u<sub>12</sub> = u<sub>1</sub> − u<sub>2</sub>. Toppene på L1 og L2 kommer ikke på samme tid, så man kan ikke bare lægge 230 V og 230 V sammen.</p>
+        <p>Med visere er U<sub>12</sub> = U<sub>1</sub> − U<sub>2</sub>. Viserne står 120° fra hinanden, så forskellen bliver 2 · U · sin 60° = √3 · U.</p>
+        <div class="eq"><span>U<sub>12</sub> = √3 · 230 V ≈ 398 V ≈ 400 V</span><span>Û<sub>12</sub> = √2 · 398 V ≈ 563 V</span><span>U<sub>12,pp</sub> = 2 · 563 V ≈ 1127 V</span></div>
+      </article>
+      <article>
+        <h3>Strøm i nullederen</h3>
+        <p>Strømmene fra de tre faser løber sammen i nul. I hvert øjeblik er i<sub>N</sub> = i<sub>1</sub> + i<sub>2</sub> + i<sub>3</sub>. Ved symmetrisk belastning ophæver de hinanden, og I<sub>N</sub> = 0.</p>
+        <p>Er kun én fase belastet, er I<sub>N</sub> lig med strømmen i den fase. To lige store strømme, der er 120° forskudt, giver I<sub>N</sub> = I og ikke 2 · I.</p>
+      </article>
+    </div>
+  </div>
+  <div class="tasks">
+    <h2>Prøv selv</h2>
+    <ol class="task-list">
+      <li>
+        <p>Sæt A på L1's positive top og B på L2's negative top. Hvor langt ligger de fra hinanden i tid, og hvad er den største spænding mellem L1 og L2?</p>
+        <div class="task-actions"><button type="button" class="ghost" data-task="t1">Vis i grafen</button>
+          <details><summary>Svar</summary><p>60°, svarende til 3,33 ms. Den største værdi af u<sub>12</sub> er 563 V (peak), og den kommer midt mellem de to toppe, ved 60°. RMS-værdien er 398 V ≈ 400 V.</p></details></div>
+      </li>
+      <li>
+        <p>Sæt A og B på de positive toppe af L1 og L2. Den lodrette afstand mellem dem er 0 V. Betyder det, at der er 0 V mellem L1 og L2?</p>
+        <div class="task-actions"><button type="button" class="ghost" data-task="t2">Vis i grafen</button>
+          <details><summary>Svar</summary><p>Nej. Spændingen mellem faserne er stadig 400 V RMS. To toppunkter på forskellige tidspunkter siger intet om forskellen i samme øjeblik. Det gør kurven u<sub>12</sub>.</p></details></div>
+      </li>
+      <li>
+        <p>Afspil animationen og hold øje med u<sub>1</sub> + u<sub>2</sub> + u<sub>3</sub> under kurverne. Hvad er summen?</p>
+        <div class="task-actions"><button type="button" class="ghost" data-task="t3">Vis i grafen</button>
+          <details><summary>Svar</summary><p>Den er 0 V i hvert øjeblik. Derfor løber der ingen strøm i nullederen, når belastningen er symmetrisk.</p></details></div>
+      </li>
+      <li>
+        <p>Strøm: Belast L1 og L2 med 10 A hver, og lad L3 være ubelastet. Gæt strømmen i nullederen, før du ser efter.</p>
+        <div class="task-actions"><button type="button" class="ghost" data-task="t4">Vis i grafen</button>
+          <details><summary>Svar</summary><p>I<sub>N</sub> = 10 A og ikke 20 A. De to strømme er 120° forskudt og ophæver delvist hinanden.</p></details></div>
+      </li>
+      <li>
+        <p>Strøm: Belast alle tre faser med 10 A, men giv L2 og L3 en faseforskydning på 60° (induktiv). Hvad sker der med I<sub>N</sub>?</p>
+        <div class="task-actions"><button type="button" class="ghost" data-task="t5">Vis i grafen</button>
+          <details><summary>Svar</summary><p>Strømmene er lige store, men de står ikke længere 120° fra hinanden. De ophæver derfor ikke hinanden, og I<sub>N</sub> bliver 10 A.</p></details></div>
+      </li>
+      <li>
+        <p>Strøm: Prøv usymmetrisk belastning med 16 A, 10 A og 4 A. Hvor stor bliver I<sub>N</sub>? Hvad ville man få ved at lægge strømmene sammen som tal?</p>
+        <div class="task-actions"><button type="button" class="ghost" data-task="t6">Vis i grafen</button>
+          <details><summary>Svar</summary><p>I<sub>N</sub> ≈ 10,4 A. Lagt sammen som tal ville det give 30 A, men strømmene skal lægges sammen som visere.</p></details></div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<p class="foot">Model: u(t) = Û · sin(ωt + vinkel) ved f = 50 Hz i et ideelt, symmetrisk net. Viserne tegnes med længden Û, så deres lodrette projektion er øjebliksværdien. Positiv φ betyder, at strømmen er forsinket i forhold til spændingen (induktiv belastning).</p>
+</div>
+
+<div id="viewInstall" role="tabpanel" aria-labelledby="tabInstall" hidden>
+  <div class="inst-bar">
+    <label class="sel">Eksempel <select id="instScenario"></select></label>
+    <label class="chip"><input type="checkbox" id="instBurn" checked> Udstyr kan brænde af</label>
+    <label class="chip"><input type="checkbox" id="instProt" checked> Afbrydere og HPFI virker</label>
+    <label class="chip"><input type="checkbox" id="instIk" checked> Vis Ik,min</label>
+    <button type="button" class="ghost" id="instRestore">Fjern alle fejl</button>
+    <button type="button" class="ghost" id="instReset">Slå afbrydere til igen</button>
+    <button type="button" class="ghost" id="instRepair">Reparer brændt udstyr</button>
+  </div>
+  <details class="quick-help" id="instHelp">
+    <summary>Sådan bruger du simulatoren</summary>
+    <ol>
+      <li><b>Klik</b> på en tavle, et kabel, en gruppe eller en brugsgenstand. Panelet til højre viser spændinger, strømme, harmoniske og forklaringer.</li>
+      <li><b>Lav en fejl.</b> "Manglende nul" på en tavle afbryder nullen før tavlen. I et kabels panel kan du afbryde L1, L2, L3, N eller PE. I en gruppes panel kan du indsætte en isolationsfejl.</li>
+      <li><b>Se konsekvensen.</b> Spændingerne i diagrammet farves efter status, hændelsesloggen viser afbrydere og udstyr, der brænder af, og viserdiagrammet viser, hvor nulpunktet er flyttet hen.</li>
+      <li><b>Mål</b> med installationstesteren i tavlens eller gruppens panel: spænding, R ISO, R LOW, Z line, Z loop, HPFI, lækstrøm, R<sub>E</sub> og jordfejl. I tavlens indstillinger vælger du HPFI-type, og på en gruppe kan du montere en AFDD.</li>
+      <li><b>Prøv opgaverne</b> under diagrammet, eller læs mere i <button type="button" class="link" data-doc="doc-start">vejledningen</button>.</li>
+    </ol>
+  </details>
+  <div class="inst-summary" id="instSummary"></div>
+  <div class="inst-log" id="instLog" hidden></div>
+  <div class="inst-bench">
+    <section class="inst-net-wrap" id="instNet" aria-label="Installationsdiagram"></section>
+    <aside class="inst-insp" id="instInsp" aria-label="Detaljer for det valgte"></aside>
+  </div>
+  <section class="inst-tasks" id="instTasks" aria-label="Opgaver til installationen"></section>
+  <p class="foot">Modellen regner nettet som et kredsløb ved 50 Hz og for hver harmonisk orden op til den 15. Brugsgenstande er faste impedanser ud fra mærkeeffekt og cos φ ved 230 V, og ikke-lineære apparater sender typiske harmoniske strømme ud. Tålegrænser, kabeldata og HPFI-tider er typiske værdier til undervisning, ikke data for bestemte produkter. <button type="button" class="link" data-doc="doc-model">Læs om modellen</button></p>
+</div>
+
+<div id="viewDocs" role="tabpanel" aria-labelledby="tabDocs" hidden></div>
+
+</div>
+<script>
+(() => {
+'use strict';
+const root = document.documentElement;
+root.lang = 'da';
+const $ = s => document.querySelector(s);
+const SQ2 = Math.SQRT2, SQ3 = Math.sqrt(3);
+const MS_PER_DEG = 20 / 360; // 50 Hz: én periode = 20 ms
+const rad = d => d * Math.PI / 180, deg = r => r * 180 / Math.PI;
+const mod = (a, m) => ((a % m) + m) % m;
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+const WIRE = ['brun', 'sort', 'grå'];
+
+/* ---------- Visere som komplekse tal. Et signal er {amp: RMS, ang: grader}, s(θ) = amp·√2·sin(θ + ang) ---------- */
+const cpol = (r, a) => ({re: r * Math.cos(rad(a)), im: r * Math.sin(rad(a))});
+const cadd = (p, q) => ({re: p.re + q.re, im: p.im + q.im});
+const csub = (p, q) => ({re: p.re - q.re, im: p.im - q.im});
+const toSig = c => ({amp: Math.hypot(c.re, c.im), ang: deg(Math.atan2(c.im, c.re))});
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('trefase.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('trefase.' + k, JSON.stringify(v)); } catch (e) { /* ingen lagring */ } },
+};
+
+const state = {
+  mode: 'U',
+  U: 230,
+  loads: [{I: 10, phi: 0}, {I: 10, phi: 0}, {I: 10, phi: 0}],
+  theta: 60,
+  playing: false,
+  speed: 0.25,
+  periods: innerWidth < 640 ? 1 : 2,
+  show: {L: [true, true, true], combo: true, N: true, proj: true, peaks: true},
+  points: {U: [{k: 0, s: 1, th: 90}, {k: 1, s: -1, th: 30}], I: [{k: 0, s: 1, th: 90}, {k: 1, s: 1, th: 210}]},
+  op: 'sum',
+  palette: store.get('palette', 'wire'),
+  big: store.get('big', false),
+};
+
+const sig = k => state.mode === 'U'
+  ? {amp: state.U, ang: -120 * k}
+  : {amp: state.loads[k].I, ang: -120 * k - state.loads[k].phi};
+const val = (s, th) => s.amp * SQ2 * Math.sin(rad(th + s.ang));
+const neutral = () => toSig([0, 1, 2].reduce((c, k) => { const s = sig(k); return cadd(c, cpol(s.amp, s.ang)); }, {re: 0, im: 0}));
+const W = () => 360 * state.periods;
+const pts = () => state.points[state.mode];
+const unit = () => state.mode === 'U' ? 'V' : 'A';
+const curTh = () => { const Wd = W(); return state.theta >= 0 && state.theta <= Wd ? state.theta : mod(state.theta, Wd); };
+const same = (a, b) => a.k === b.k && a.s === b.s && Math.abs(a.th - b.th) < 1e-6;
+
+function pair() {
+  const [A, B] = pts();
+  if (!A || !B) return null;
+  if (A.k === B.k) return {A, B, same: true};
+  const op = state.mode === 'U' ? 'diff' : state.op;
+  const a = sig(A.k), b = sig(B.k), pa = cpol(a.amp, a.ang), pb = cpol(b.amp, b.ang);
+  return {A, B, same: false, op, combo: toSig(op === 'diff' ? csub(pa, pb) : cadd(pa, pb))};
+}
+function names(p) {
+  const a = p.A.k + 1, b = p.B.k + 1;
+  if (state.mode === 'U') return {inst: `u_${a}${b}`, ph: `U_${a}${b}`, eq: `u_${a}${b}(t) = u_${a}(t) − u_${b}(t)`};
+  const o = p.op === 'diff' ? '−' : '+';
+  return {inst: `i_${a}${o}i_${b}`, ph: `I_${a}${o}I_${b}`, eq: `i_${a}(t) ${o} i_${b}(t)`};
+}
+
+/* Toppunkter: positiv top når θ + ang = 90°, negativ når θ + ang = 270° */
+function peakTimes(s, sign) {
+  const out = [];
+  for (let t = mod((sign > 0 ? 90 : 270) - s.ang, 360); t < W() - 1e-9; t += 360) out.push(t);
+  return out;
+}
+const nearest = (list, near) => list.reduce((b, t) => Math.abs(t - near) < Math.abs(b - near) ? t : b, list[0]);
+function snap(p, near) { if (p) p.th = nearest(peakTimes(sig(p.k), p.s), near); }
+function resnap() { const [A, B] = pts(); if (A) snap(A, A.th); if (B) snap(B, B.th); }
+function comboPeak(p) {
+  const mid = (p.A.th + p.B.th) / 2;
+  return nearest([...peakTimes(p.combo, 1), ...peakTimes(p.combo, -1)], mid);
+}
+
+/* ---------- Formatering ---------- */
+const NF = [0, 1, 2].map(d => new Intl.NumberFormat('da-DK', {minimumFractionDigits: d, maximumFractionDigits: d}));
+function fmt(v, d = 1, sign = false) {
+  if (Math.abs(v) < 0.5 * 10 ** -d) v = 0;
+  return (v < 0 ? '−' : sign && v > 0 ? '+' : '') + NF[d].format(Math.abs(v));
+}
+const fmtS = v => fmt(v, Math.abs(v - Math.round(v)) < 0.05 ? 0 : 1);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const sub = s => esc(s).replace(/_(\w+)/g, '<sub>$1</sub>');
+
+/* ---------- Farver fra CSS-tokens ---------- */
+let dirty = true;
+const col = {};
+function readColors() {
+  const cs = getComputedStyle(root);
+  for (const k of ['panel', 'ink', 'muted', 'line', 'grid', 'axis', 'l1', 'l2', 'l3', 'n', 'combo', 'bad']) col[k] = cs.getPropertyValue('--' + k).trim();
+  col.body = cs.getPropertyValue('--font-body').trim();
+  col.mono = cs.getPropertyValue('--font-mono').trim();
+  dirty = true;
+}
+const phc = k => col['l' + (k + 1)];
+
+/* ---------- Tegnehjælpere ---------- */
+function setup(cv) {
+  const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return {ctx, w: r.width, h: r.height};
+}
+function seg(ctx, x0, y0, x1, y1) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
+function dot(ctx, x, y, r, fill, stroke, sw) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw || 1.5; ctx.stroke(); }
+}
+// Tekst med sænket skrift: "U_12" tegnes som U med 12 sænket
+function text(ctx, str, x, y, o = {}) {
+  const size = o.size || 12, wt = o.weight || 600, fam = o.mono ? col.mono : col.body;
+  const segs = String(str).split(/_(\w+)/).map((t, i) => ({t, sub: i % 2 === 1}));
+  let w = 0;
+  for (const s of segs) { s.sz = s.sub ? size * 0.72 : size; ctx.font = `${wt} ${s.sz}px ${fam}`; s.w = s.t ? ctx.measureText(s.t).width : 0; w += s.w; }
+  if (o.dry) return w;
+  const x0 = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  for (const pass of o.halo ? ['halo', 'fill'] : ['fill']) {
+    let xx = x0;
+    for (const s of segs) {
+      if (!s.t) continue;
+      ctx.font = `${wt} ${s.sz}px ${fam}`;
+      const yy = y + (s.sub ? size * 0.3 : 0);
+      if (pass === 'halo') { ctx.strokeStyle = o.halo; ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(s.t, xx, yy); }
+      else { ctx.fillStyle = o.color || col.ink; ctx.fillText(s.t, xx, yy); }
+      xx += s.w;
+    }
+  }
+  return w;
+}
+function arrow(ctx, x0, y0, x1, y1, c, width, head, dash) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
+  if (L < 1) return;
+  const ux = dx / L, uy = dy / L, hl = Math.min(head, L * 0.45), hw = hl * 0.5;
+  ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.setLineDash(dash || []);
+  seg(ctx, x0, y0, x1 - ux * hl * 0.8, y1 - uy * hl * 0.8);
+  ctx.setLineDash([]); ctx.lineCap = 'butt';
+  ctx.beginPath(); ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 - ux * hl - uy * hw, y1 - uy * hl + ux * hw);
+  ctx.lineTo(x1 - ux * hl + uy * hw, y1 - uy * hl - ux * hw);
+  ctx.closePath(); ctx.fill();
+}
+function vHead(ctx, x, yTip, dir, sz, c) { // dir −1: peger op, +1: peger ned
+  ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x, yTip);
+  ctx.lineTo(x - sz * 0.55, yTip - dir * sz); ctx.lineTo(x + sz * 0.55, yTip - dir * sz);
+  ctx.closePath(); ctx.fill();
+}
+function curve(ctx, s, c, width, dash, X, Y, Wd, pw) {
+  const n = Math.max(60, Math.ceil(pw / 1.5));
+  ctx.beginPath();
+  for (let i = 0; i <= n; i++) { const t = i / n * Wd, x = X(t), y = Y(val(s, t)); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+  ctx.strokeStyle = c; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.setLineDash(dash || []); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function margins() {
+  const b = state.big ? 1.25 : 1;
+  return {MT: 24 * b, MB: 44 * b, ML: 52 * b, MR: 16, fs: 12 * b, lw: state.big ? 1.4 : 1};
+}
+function niceStep(x) {
+  const p = 10 ** Math.floor(Math.log10(x)), f = x / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+function maxAmp() {
+  if (state.mode === 'U') return state.U * SQ2 * SQ3; // fast skala, så den ikke hopper når punkterne flyttes
+  let m = Math.max(...state.loads.map(L => L.I * SQ2), neutral().amp * SQ2);
+  const p = pair();
+  if (p && !p.same) m = Math.max(m, p.combo.amp * SQ2);
+  return Math.max(m, 1);
+}
+function yScale(phH) {
+  const m = maxAmp() * 1.04, n = Math.max(2, Math.floor((phH / 2) / 34));
+  const step = niceStep(m / n);
+  return {R: Math.ceil(m / step) * step, step};
+}
+function visible() {
+  const out = [], U = state.mode === 'U' ? 'U' : 'I';
+  for (let k = 0; k < 3; k++) if (state.show.L[k]) out.push({s: sig(k), c: phc(k), name: `${U}_${k + 1}`, w: 2.2});
+  if (state.mode === 'I' && state.show.N) out.push({s: neutral(), c: col.n, name: 'I_N', w: 2.4, dash: [7, 5]});
+  const p = pair();
+  if (p && !p.same && state.show.combo) out.push({s: p.combo, c: col.combo, name: names(p).ph, w: 3.2, combo: true});
+  return out;
+}
+
+/* ---------- Kurver over tid ---------- */
+let geo = null, peaks = [], hover = null;
+function drawWave(sc) {
+  const {ctx, w, h} = setup(el.cvW);
+  const {MT, MB, ML, MR, fs, lw} = margins();
+  const pw = Math.max(20, w - ML - MR), phH = Math.max(20, h - MT - MB);
+  const y0 = MT + phH / 2, sy = (phH / 2) / sc.R, Wd = W();
+  const X = t => ML + t / Wd * pw, Y = v => y0 - v * sy;
+  geo = {ML, pw, Wd};
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineWidth = 1;
+
+  // Lodret gitter hver 30°, tydeligere og med tal hver 90°
+  for (let t = 0; t <= Wd + 1e-6; t += 30) {
+    const x = Math.round(X(t)) + 0.5, major = t % 90 === 0;
+    ctx.strokeStyle = major ? col.line : col.grid;
+    seg(ctx, x, MT, x, MT + phH);
+    if (major) {
+      const al = t >= Wd ? 'right' : 'center';
+      text(ctx, `${t}°`, x, MT + phH + fs * 1.2, {size: fs, align: al, color: col.ink, weight: 500, mono: true});
+      text(ctx, `${fmt(t * MS_PER_DEG, 0)} ms`, x, MT + phH + fs * 2.45, {size: fs * 0.92, align: al, color: col.muted, weight: 500, mono: true});
+    }
+  }
+  // Vandret gitter
+  const n = Math.round(sc.R / sc.step), dec = sc.step % 1 ? 1 : 0;
+  for (let i = -n; i <= n; i++) {
+    const v = i * sc.step, y = Math.round(Y(v)) + 0.5;
+    ctx.strokeStyle = i === 0 ? col.axis : col.grid;
+    seg(ctx, ML, y, ML + pw, y);
+    text(ctx, fmt(v, dec), ML - 7, y, {size: fs, align: 'right', color: col.muted, weight: 500, mono: true});
+  }
+  text(ctx, unit(), ML - 7, MT - fs, {size: fs, align: 'right', color: col.ink, weight: 600, mono: true});
+
+  // Spidsværdi for en fase som reference
+  if (state.mode === 'U') {
+    const up = state.U * SQ2;
+    ctx.setLineDash([3, 4]); ctx.strokeStyle = col.axis;
+    for (const v of [up, -up]) seg(ctx, ML, Y(v), ML + pw, Y(v));
+    ctx.setLineDash([]);
+    text(ctx, `±Û = ${fmt(up)} V`, ML + pw - 6, Y(up) - fs * 0.8, {size: fs * 0.9, align: 'right', color: col.muted, weight: 500, halo: col.panel});
+  }
+
+  const thc = curTh(), xc = X(thc), vis = visible(), p = pair();
+
+  ctx.save(); ctx.beginPath(); ctx.rect(ML, MT - 6, pw, phH + 12); ctx.clip();
+  if (state.show.proj) {
+    ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.globalAlpha = 0.65;
+    for (const v of vis) { const y = Y(val(v.s, thc)); ctx.strokeStyle = v.c; seg(ctx, ML, y, xc, y); }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  for (const v of vis) curve(ctx, v.s, v.c, v.w * lw, v.dash, X, Y, Wd, pw);
+  ctx.restore();
+
+  // Den naive regning: lodret afstand mellem to toppunkter, der ikke sker samtidig
+  if (p && !p.same && p.op === 'diff') {
+    const vA = val(sig(p.A.k), p.A.th), vB = val(sig(p.B.k), p.B.th);
+    const xa = X(p.A.th), xb = X(p.B.th), ya = Y(vA), yb = Y(vB);
+    let xm = (xa + xb) / 2;
+    if (Math.abs(xm - xc) < 16) xm = xc - 16;
+    ctx.strokeStyle = col.bad; ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1.2 * lw; ctx.setLineDash([2, 3]);
+    seg(ctx, xa, ya, xm, ya); seg(ctx, xb, yb, xm, yb);
+    ctx.lineWidth = 1.8 * lw; ctx.setLineDash([5, 4]);
+    seg(ctx, xm, ya, xm, yb);
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    const top = Math.min(ya, yb), bot = Math.max(ya, yb), hs = 7 * lw;
+    if (bot - top > hs * 2.5) { vHead(ctx, xm, top, -1, hs, col.bad); vHead(ctx, xm, bot, 1, hs, col.bad); }
+    text(ctx, `${fmt(Math.abs(vA - vB))} ${unit()}?`, xm - 7, (ya + yb) / 2, {size: fs * 1.05, align: 'right', color: col.bad, weight: 700, halo: col.panel});
+  }
+
+  // Tidsmarkør
+  ctx.strokeStyle = col.ink; ctx.lineWidth = 1.4 * lw;
+  seg(ctx, xc, MT - 4, xc, MT + phH + 4);
+  ctx.fillStyle = col.ink; ctx.beginPath();
+  ctx.moveTo(xc - 6, MT - 11); ctx.lineTo(xc + 6, MT - 11); ctx.lineTo(xc, MT - 3); ctx.closePath(); ctx.fill();
+
+  // Differens i samme øjeblik = lodret afstand mellem de to kurver ved markøren
+  if (p && !p.same && p.op === 'diff' && state.show.combo) {
+    const va = val(sig(p.A.k), thc), vb = val(sig(p.B.k), thc), ya = Y(va), yb = Y(vb);
+    ctx.strokeStyle = col.combo; ctx.lineWidth = 3.4 * lw; ctx.lineCap = 'round';
+    seg(ctx, xc, ya, xc, yb); seg(ctx, xc - 5, ya, xc + 5, ya); seg(ctx, xc - 5, yb, xc + 5, yb);
+    ctx.lineCap = 'butt';
+    const lbl = `${names(p).inst} = ${fmt(va - vb, 1, true)} ${unit()}`;
+    const tw = text(ctx, lbl, 0, 0, {size: fs * 1.05, weight: 700, dry: true});
+    const right = xc + 12 + tw < ML + pw;
+    text(ctx, lbl, right ? xc + 12 : xc - 12, (ya + yb) / 2, {size: fs * 1.05, align: right ? 'left' : 'right', color: col.combo, weight: 700, halo: col.panel});
+  }
+  for (const v of vis) dot(ctx, xc, Y(val(v.s, thc)), 3.6 * lw, v.c, col.panel, 1.5);
+
+  // Toppunkter (klikbare)
+  peaks = [];
+  for (let k = 0; k < 3; k++) {
+    if (!state.show.L[k]) continue;
+    const s = sig(k);
+    if (s.amp < 1e-9) continue;
+    for (const sg of [1, -1]) for (const t of peakTimes(s, sg)) {
+      const pk = {k, s: sg, th: t, x: X(t), y: Y(val(s, t))};
+      peaks.push(pk);
+      const hv = hover && same(hover, pk);
+      if (hv) { ctx.globalAlpha = 0.25; dot(ctx, pk.x, pk.y, 11 * lw, phc(k)); ctx.globalAlpha = 1; }
+      if (state.show.peaks || hv) dot(ctx, pk.x, pk.y, (hv ? 6 : 4.5) * lw, col.panel, phc(k), 1.6 * lw);
+    }
+  }
+
+  // Punkt A og B
+  pts().forEach((P, i) => {
+    if (!P) return;
+    const x = X(P.th), y = Y(val(sig(P.k), P.th));
+    ctx.strokeStyle = col.ink; ctx.globalAlpha = 0.45; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    seg(ctx, x, y, x, y0);
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    dot(ctx, x, y, 10 * lw, null, col.ink, 1.4);
+    dot(ctx, x, y, 6.5 * lw, phc(P.k), col.panel, 2);
+    const ty = clamp(P.s > 0 ? y - 23 * lw : y + 23 * lw, 10 * lw, h - 10 * lw);
+    dot(ctx, x, ty, 9 * lw, col.ink);
+    text(ctx, 'AB'[i], x, ty + 0.5, {size: fs * 1.05, align: 'center', color: col.panel, weight: 700});
+  });
+
+  // Den største værdi af kombinationen
+  if (p && !p.same && state.show.combo && p.combo.amp > 1e-9) {
+    const t = comboPeak(p), v = val(p.combo, t), x = X(t), y = Y(v);
+    dot(ctx, x, y, 5 * lw, col.combo, col.panel, 1.5);
+    const lbl = `${state.mode === 'U' ? 'Û' : 'Î'} = ${fmt(Math.abs(v))} ${unit()}`;
+    const tw = text(ctx, lbl, 0, 0, {size: fs, weight: 700, dry: true});
+    const right = x + 10 + tw < ML + pw;
+    text(ctx, lbl, right ? x + 10 : x - 10, clamp(y, 10, h - 10), {size: fs, align: right ? 'left' : 'right', color: col.combo, weight: 700, halo: col.panel});
+  }
+}
+
+/* ---------- Roterende viserdiagram ---------- */
+function drawPhasor(sc, stacked) {
+  const {ctx, w, h} = setup(el.cvP);
+  const {MT, MB, fs, lw} = margins();
+  const phH = Math.max(20, h - MT - MB), cy = MT + phH / 2, c0 = w / 2, sy = (phH / 2) / sc.R;
+  const th = curTh(), rMax = Math.min(phH / 2, w / 2 - 2);
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineWidth = 1; ctx.strokeStyle = col.grid;
+  for (let v = sc.step; v <= sc.R + 1e-9; v += sc.step) {
+    const r = v * sy;
+    if (r > rMax + 0.5) break;
+    ctx.beginPath(); ctx.arc(c0, cy, r, 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.strokeStyle = col.line;
+  seg(ctx, c0 - rMax, cy, c0 + rMax, cy); seg(ctx, c0, cy - rMax, c0, cy + rMax);
+  text(ctx, `ωt = ${fmt(mod(th, 360), 0)}°`, 4, MT / 2, {size: fs, color: col.ink, weight: 600, mono: true});
+  text(ctx, '↺ mod uret', w - 4, MT / 2, {size: fs * 0.92, align: 'right', color: col.muted, weight: 500});
+
+  const vec = s => { const a = rad(th + s.ang), L = s.amp * SQ2 * sy; return [L * Math.cos(a), -L * Math.sin(a)]; };
+  const tips = visible().map(v => { const [dx, dy] = vec(v.s); return Object.assign({}, v, {x: c0 + dx, y: cy + dy, dx, dy}); });
+
+  // Ved strøm: spændingernes retning som tynde streger, så φ kan ses
+  if (state.mode === 'I') {
+    ctx.setLineDash([2, 4]); ctx.lineWidth = 1; ctx.globalAlpha = 0.55;
+    for (let k = 0; k < 3; k++) { const a = rad(th - 120 * k); ctx.strokeStyle = phc(k); seg(ctx, c0, cy, c0 + rMax * Math.cos(a), cy - rMax * Math.sin(a)); }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  if (state.show.proj && !stacked) {
+    ctx.setLineDash([2, 3]); ctx.lineWidth = 1; ctx.globalAlpha = 0.65;
+    for (const t of tips) { ctx.strokeStyle = t.c; seg(ctx, t.x, t.y, w, t.y); }
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+  }
+  // Viseraddition for nulstrømmen: I1, så I2, så I3 sat i forlængelse
+  if (state.mode === 'I' && state.show.N) {
+    let x = c0, y = cy;
+    ctx.globalAlpha = 0.55;
+    for (let k = 0; k < 3; k++) {
+      const [dx, dy] = vec(sig(k));
+      if (k > 0 && Math.hypot(dx, dy) > 1) arrow(ctx, x, y, x + dx, y + dy, phc(k), 1.5 * lw, 8 * lw, [4, 3]);
+      x += dx; y += dy;
+    }
+    ctx.globalAlpha = 1;
+  }
+  const p = pair();
+  if (p && !p.same && state.show.combo) {
+    const [ax, ay] = vec(sig(p.A.k)), [bx, by] = vec(sig(p.B.k));
+    ctx.globalAlpha = 0.75;
+    if (p.op === 'diff') arrow(ctx, c0 + bx, cy + by, c0 + ax, cy + ay, col.combo, 1.6 * lw, 9 * lw, [5, 4]);
+    else arrow(ctx, c0 + ax, cy + ay, c0 + ax + bx, cy + ay + by, col.combo, 1.6 * lw, 9 * lw, [5, 4]);
+    ctx.globalAlpha = 1;
+  }
+  for (const t of tips) arrow(ctx, c0, cy, t.x, t.y, t.c, (t.combo ? 3.2 : 2.6) * lw, 11 * lw, t.dash);
+  dot(ctx, c0, cy, 3, col.ink);
+  for (const t of tips) {
+    const L = Math.hypot(t.dx, t.dy);
+    if (L < 6) continue;
+    text(ctx, t.name, t.x + t.dx / L * 15 * lw, t.y + t.dy / L * 15 * lw, {size: fs * 1.05, align: 'center', color: t.c, weight: 700, halo: col.panel});
+  }
+  text(ctx, 'Viserlængde = spidsværdi', c0, h - MB / 2, {size: fs * 0.92, align: 'center', color: col.muted, weight: 500});
+}
+
+function drawAll() {
+  const {MT, MB} = margins();
+  const sc = yScale(el.cvW.getBoundingClientRect().height - MT - MB);
+  drawWave(sc);
+  drawPhasor(sc, Math.abs(el.pWrap.offsetTop - el.wWrap.offsetTop) > 2);
+  updateReadouts();
+}
+
+/* ---------- Panel ---------- */
+const el = {
+  cvP: $('#cvP'), cvW: $('#cvW'), pWrap: $('#pWrap'), wWrap: $('#wWrap'), scope: $('#scope'),
+  play: $('#playBtn'), thetaRange: $('#thetaRange'), time: $('#timeOut'),
+  legend: $('#legend'), readouts: $('#readouts'), result: $('#result'), neutral: $('#neutralCard'),
+  ptEditor: $('#ptEditor'), examples: $('#examples'), presets: $('#presets'), loads: $('#loads'),
+  uIn: $('#uIn'), uDerived: $('#uDerived'), opSeg: $('#opSeg'), opNote: $('#opNote'),
+  palBtn: $('#palBtn'), bigBtn: $('#bigBtn'), themeBtn: $('#themeBtn'),
+};
+
+function tiles(rms, pk, u, c) {
+  const t = (l, d, v) => `<div class="tile"><span class="t-l">${l}<span>${d}</span></span><span class="t-v num" style="--c:${c}">${fmt(v)} <small>${u}</small></span></div>`;
+  return `<div class="tiles">${t('RMS', 'effektivværdi', rms)}${t('Peak', 'spidsværdi', pk)}${t('Peak-peak', 'spids-spids', 2 * pk)}</div>`;
+}
+
+function renderResult() {
+  const m = state.mode, u = unit(), [A, B] = pts();
+  let html = '<h2>Måling mellem A og B</h2>';
+  if (!A || !B) {
+    el.result.innerHTML = html + `<p class="hint">Sæt ${!A && !B ? 'to punkter' : 'ét punkt mere'} på kurvernes toppe. Klik direkte i grafen eller brug knapperne ovenfor.</p>`;
+    return;
+  }
+  const sa = sig(A.k), sb = sig(B.k), vA = val(sa, A.th), vB = val(sb, B.th);
+  const ptl = (tag, P, v) => `<div class="ptl"><span class="pt-tag">${tag}</span><span><span class="dot" style="--c:var(--l${P.k + 1})"></span> L${P.k + 1}, ${P.s > 0 ? 'positiv' : 'negativ'} top: <b class="num">${fmt(v, 1, true)} ${u}</b> <span class="muted num">ved ${fmt(P.th, 0)}° · ${fmt(P.th * MS_PER_DEG, 2)} ms</span></span></div>`;
+  html += `<div class="ptls">${ptl('A', A, vA)}${ptl('B', B, vB)}</div>`;
+
+  if (A.k === B.k) {
+    const pk = sa.amp * SQ2;
+    const what = m === 'U' ? `spændingen mellem L${A.k + 1} og nul (fasespændingen)` : `strømmen i L${A.k + 1}`;
+    const note = A.s !== B.s
+      ? `Den lodrette afstand mellem A og B er peak-peak-værdien, ${fmt(Math.abs(vA - vB))} ${u}. Her passer det, fordi det er den samme kurve, der svinger fra top til bund.`
+      : `A og B er den samme top med ${fmt(Math.abs(A.th - B.th) / 360, 0)} periode imellem.`;
+    el.result.innerHTML = html + `<div class="verdict info"><p>Begge punkter ligger på L${A.k + 1}. Det er ${what}.</p>${tiles(sa.amp, pk, u, `var(--l${A.k + 1})`)}<p>${note}</p></div>`;
+    return;
+  }
+
+  const p = pair(), nm = names(p), dth = Math.abs(A.th - B.th), c = p.combo, pk = c.amp * SQ2;
+  const diff = p.op === 'diff';
+  html += `<div class="verdict bad"><span class="badge">✗ Naiv regning</span>`;
+  if (diff) html += `<p>Lodret afstand mellem A og B: <span class="num">(${fmt(vA, 1, true)}) − (${fmt(vB, 1, true)}) = <b class="strike">${fmt(vA - vB)} ${u}</b></span></p>`;
+  html += `<p>Effektivværdier lagt sammen som tal: <span class="num">${fmtS(sa.amp)} + ${fmtS(sb.amp)} = <b class="strike">${fmtS(sa.amp + sb.amp)} ${u}</b></span></p>
+    <p>Men A og B sker ikke på samme tid. De ligger ${fmt(dth, 0)}° (${fmt(dth * MS_PER_DEG, 2)} ms) fra hinanden.</p></div>`;
+
+  const atA = val(c, A.th), atB = val(c, B.th), tp = comboPeak(p), vp = val(c, tp);
+  const midTxt = Math.abs(tp - (A.th + B.th) / 2) < 0.5 ? ', midt mellem A og B' : '';
+  html += `<div class="verdict good"><span class="badge">✓ Det rigtige</span>
+    <p class="formula">${sub(nm.eq)}</p>
+    ${tiles(c.amp, pk, u, 'var(--combo)')}
+    <p>${m === 'U' ? 'Spændingen mellem to faser er forskellen i samme øjeblik. ' : ''}Ved A er ${sub(nm.inst)} = <b class="num">${fmt(atA, 1, true)} ${u}</b>, og ved B er den <b class="num">${fmt(atB, 1, true)} ${u}</b>. Den største værdi, <b class="num">${fmt(Math.abs(vp))} ${u}</b>, kommer ved ${fmt(tp, 0)}°${midTxt}.</p>`;
+  const d = mod(sa.ang - sb.ang, 360);
+  const sym120 = sa.amp > 0 && Math.abs(sa.amp - sb.amp) < 1e-6 && (Math.abs(d - 120) < 0.5 || Math.abs(d - 240) < 0.5);
+  if (sym120 && diff) html += `<p class="key">${sub(nm.ph)} = √3 · ${fmtS(sa.amp)} ${u} = ${fmt(c.amp)} ${u}${m === 'U' && Math.round(sa.amp) === 230 ? ' ≈ 400 V' : ''}</p>`;
+  if (sym120 && !diff) html += `<p>To lige store strømme, der er 120° forskudt, giver en sum, der er lige så stor som hver af dem.</p>`;
+  if (m === 'I' && !diff) {
+    const k3 = 3 - A.k - B.k, I3 = state.loads[k3].I;
+    html += `<p>Hvis kun L${A.k + 1} og L${B.k + 1} er belastet, er det strømmen i nullederen.${I3 > 0 ? ` L${k3 + 1} er også belastet (${fmtS(I3)} A), så den samlede I<sub>N</sub> er ${fmt(neutral().amp)} A (se nedenfor).` : ''}</p>`;
+  }
+  if (m === 'I' && diff) html += `<p>Det er samme regning som spændingen mellem to faser. Man kender det fra trekantkobling, hvor strømmen i ledningen er √3 gange strømmen i hver gren.</p>`;
+  el.result.innerHTML = html + '</div>';
+}
+
+function renderNeutral() {
+  if (state.mode !== 'I') return;
+  const N = neutral(), L = state.loads, sum = L[0].I + L[1].I + L[2].I;
+  const differs = Math.abs(sum - N.amp) > 0.05;
+  el.neutral.innerHTML = `<h2>Strøm i nullederen</h2>
+    <p class="formula">${sub('i_N(t) = i_1(t) + i_2(t) + i_3(t)')}</p>
+    ${tiles(N.amp, N.amp * SQ2, 'A', 'var(--n)')}
+    <p>Lagt sammen som tal: <span class="num">${fmtS(L[0].I)} + ${fmtS(L[1].I)} + ${fmtS(L[2].I)} = ${differs ? `<b class="strike">${fmtS(sum)} A</b>` : `${fmtS(sum)} A`}</span>. Lagt sammen som visere: <b class="num">${fmt(N.amp)} A</b>.</p>
+    ${N.amp < 0.05 && sum > 0 ? '<p class="pill">Symmetrisk belastning: strømmene ophæver hinanden</p>' : ''}`;
+}
+
+let roList = [];
+function buildReadouts() {
+  const m = state.mode, lc = m === 'U' ? 'u' : 'i';
+  const items = [0, 1, 2].map(k => ({label: `${lc}_${k + 1}`, c: `var(--l${k + 1})`, fn: th => val(sig(k), th)}));
+  if (m === 'U') items.push({label: 'u_1 + u_2 + u_3', c: 'var(--muted)', fn: th => [0, 1, 2].reduce((a, k) => a + val(sig(k), th), 0)});
+  else items.push({label: 'i_N = i_1 + i_2 + i_3', c: 'var(--n)', fn: th => val(neutral(), th)});
+  const p = pair();
+  if (p && !p.same) { const cmb = p.combo; items.push({label: names(p).inst, c: 'var(--combo)', fn: th => val(cmb, th)}); }
+  el.readouts.innerHTML = items.map((it, i) => `<div class="ro"><span class="ro-l"><span class="dot" style="--c:${it.c}"></span>${sub(it.label)}</span><span class="ro-v num" id="ro${i}"></span></div>`).join('');
+  roList = items.map((it, i) => ({fn: it.fn, node: $('#ro' + i)}));
+}
+function updateReadouts() {
+  const th = curTh(), u = unit();
+  for (const r of roList) r.node.textContent = `${fmt(r.fn(th), 1, true)} ${u}`;
+  el.time.textContent = `θ = ${fmt(th, 0)}° · t = ${fmt(th * MS_PER_DEG, 2)} ms`;
+  el.thetaRange.value = th;
+}
+
+function getShow(key) {
+  if (key[0] === 'L') return state.show.L[+key[1]];
+  return {N: state.show.N, C: state.show.combo, proj: state.show.proj, peaks: state.show.peaks}[key];
+}
+function setShow(key, v) {
+  if (key[0] === 'L') state.show.L[+key[1]] = v;
+  else if (key === 'N') state.show.N = v;
+  else if (key === 'C') state.show.combo = v;
+  else state.show[key] = v;
+}
+function buildLegend() {
+  const wire = state.palette === 'wire';
+  const items = [0, 1, 2].map(k => ({key: 'L' + k, c: `var(--l${k + 1})`, html: `L${k + 1}${wire ? ` <span class="muted">${WIRE[k]}</span>` : ''}`}));
+  if (state.mode === 'I') items.push({key: 'N', c: 'var(--n)', html: `i<sub>N</sub>${wire ? ' <span class="muted">blå</span>' : ''}`});
+  items.push({key: 'C', c: 'var(--combo)', html: '<span id="comboName"></span>'});
+  items.push({key: 'proj', html: 'Projektionslinjer'});
+  items.push({key: 'peaks', html: 'Toppunkter'});
+  el.legend.innerHTML = items.map(it => `<label class="chip"><input type="checkbox" data-key="${it.key}"${getShow(it.key) ? ' checked' : ''}>${it.c ? `<span class="dot" style="--c:${it.c}"></span>` : ''}${it.html}</label>`).join('');
+  syncLegend();
+}
+function syncLegend() {
+  const n = $('#comboName'), p = pair();
+  if (n) n.innerHTML = p && !p.same ? sub(names(p).inst) : (state.mode === 'U' ? 'Differens A − B' : 'Kombination af A og B');
+}
+
+function buildEditor() {
+  el.ptEditor.innerHTML = ['A', 'B'].map((tag, i) => `<div class="pt-row" data-i="${i}">
+    <span class="pt-tag">${tag}</span>
+    <div class="seg" role="group" aria-label="Fase for punkt ${tag}">${[0, 1, 2].map(k => `<button type="button" data-k="${k}"><span class="dot" style="--c:var(--l${k + 1})"></span>L${k + 1}</button>`).join('')}</div>
+    <div class="seg" role="group" aria-label="Halvperiode for punkt ${tag}"><button type="button" data-s="1">+ top</button><button type="button" data-s="-1">− top</button></div>
+    <button type="button" class="icon-btn" data-clear aria-label="Fjern punkt ${tag}">×</button>
+  </div>`).join('') + '<p class="hint">Klik på en top i grafen, eller vælg her.</p>';
+}
+function syncEditor() {
+  const P = pts();
+  el.ptEditor.querySelectorAll('.pt-row').forEach(row => {
+    const p = P[+row.dataset.i];
+    row.querySelectorAll('[data-k]').forEach(b => b.setAttribute('aria-pressed', !!p && p.k === +b.dataset.k));
+    row.querySelectorAll('[data-s]').forEach(b => b.setAttribute('aria-pressed', !!p && p.s === +b.dataset.s));
+    row.querySelector('[data-clear]').disabled = !p;
+  });
+}
+
+const EXAMPLES = [
+  {label: 'L1+ / L2−', pts: [[0, 1], [1, -1]]},
+  {label: 'L1+ / L2+', pts: [[0, 1], [1, 1]]},
+  {label: 'L1+ / L1−', pts: [[0, 1], [0, -1]]},
+];
+function setPoints(list) {
+  const P = pts();
+  P[0] = {k: list[0][0], s: list[0][1], th: 180}; snap(P[0], 180);
+  P[1] = {k: list[1][0], s: list[1][1], th: P[0].th}; snap(P[1], P[0].th);
+}
+
+const PRESETS = [
+  {label: 'Symmetrisk', loads: [[10, 0], [10, 0], [10, 0]]},
+  {label: 'Kun L1', loads: [[10, 0], [0, 0], [0, 0]]},
+  {label: 'L1 og L2', loads: [[10, 0], [10, 0], [0, 0]]},
+  {label: 'Usymmetrisk', loads: [[16, 0], [10, 0], [4, 0]]},
+  {label: 'Symmetrisk, cos φ 0,8', loads: [[10, 37], [10, 37], [10, 37]]},
+  {label: 'Blandet φ', loads: [[10, 0], [10, 60], [10, 60]]},
+];
+function buildLoads() {
+  el.presets.innerHTML = PRESETS.map((p, i) => `<button type="button" class="ghost" data-preset="${i}">${p.label}</button>`).join('');
+  el.loads.innerHTML = [0, 1, 2].map(k => `<div class="load" style="--c:var(--l${k + 1})">
+    <div class="load-h"><span class="dot"></span><b>L${k + 1}</b><output class="num" id="iOut${k}"></output></div>
+    <label class="slider">Strøm I<sub>${k + 1}</sub><input type="range" id="iIn${k}" min="0" max="32" step="0.5"></label>
+    <label class="slider">Forskydning φ<sub>${k + 1}</sub><input type="range" id="pIn${k}" min="-90" max="90" step="1"></label>
+    <output class="phi-out num" id="pOut${k}"></output>
+  </div>`).join('');
+}
+function syncLoads() {
+  state.loads.forEach((L, k) => {
+    $('#iIn' + k).value = L.I; $('#pIn' + k).value = L.phi;
+    $('#iOut' + k).textContent = `${fmtS(L.I)} A`;
+    const kind = L.phi > 0 ? 'induktiv' : L.phi < 0 ? 'kapacitiv' : 'ohmsk';
+    $('#pOut' + k).textContent = `φ = ${fmt(L.phi, 0)}° · cos φ = ${fmt(Math.cos(rad(L.phi)), 2)} (${kind})`;
+  });
+  el.presets.querySelectorAll('[data-preset]').forEach(b => {
+    const pr = PRESETS[+b.dataset.preset];
+    b.setAttribute('aria-pressed', pr.loads.every(([I, phi], k) => state.loads[k].I === I && state.loads[k].phi === phi));
+  });
+}
+function syncU() {
+  const U = state.U;
+  el.uDerived.textContent = `Û = ${fmt(U * SQ2)} V · peak-peak ${fmt(2 * U * SQ2)} V · mellem to faser √3·U = ${fmt(U * SQ3)} V`;
+}
+function syncOp() {
+  el.opSeg.querySelectorAll('[data-op]').forEach(b => b.setAttribute('aria-pressed', b.dataset.op === state.op));
+  el.opNote.textContent = state.op === 'sum'
+    ? 'Sum: den strøm, der løber i nul, hvis kun de to faser er belastet.'
+    : 'Differens: samme regning som spændingen mellem to faser.';
+}
+
+function update() {
+  syncEditor(); syncOp(); syncLoads(); syncU();
+  renderResult(); renderNeutral(); buildReadouts(); syncLegend();
+  dirty = true;
+}
+function setMode(m) {
+  state.mode = m;
+  $('#modeU').setAttribute('aria-pressed', m === 'U');
+  $('#modeI').setAttribute('aria-pressed', m === 'I');
+  document.querySelectorAll('[data-mode]').forEach(n => { n.hidden = n.dataset.mode !== m; });
+  resnap(); buildLegend(); update();
+}
+function setPlaying(on) {
+  state.playing = on;
+  el.play.textContent = on ? '❚❚ Pause' : '▶︎ Afspil';
+  el.play.setAttribute('aria-pressed', on);
+}
+function placePoint(hp) {
+  const P = pts(), np = {k: hp.k, s: hp.s, th: hp.th};
+  const i = P.findIndex(p => p && same(p, hp));
+  if (i >= 0) P[i] = null;          // klik på et punkt fjerner det
+  else if (!P[0]) P[0] = np;
+  else if (!P[1]) P[1] = np;
+  else P[1] = np;                   // begge sat: B flyttes
+  update();
+}
+
+/* ---------- Opgaver ---------- */
+const TASKS = {
+  t1: {mode: 'U', pts: [[0, 1], [1, -1]], theta: 60},
+  t2: {mode: 'U', pts: [[0, 1], [1, 1]], theta: 90},
+  t3: {mode: 'U', theta: 0, play: true},
+  t4: {mode: 'I', loads: [[10, 0], [10, 0], [0, 0]], pts: [[0, 1], [1, 1]], op: 'sum', theta: 150},
+  t5: {mode: 'I', loads: [[10, 0], [10, 60], [10, 60]], theta: 90},
+  t6: {mode: 'I', loads: [[16, 0], [10, 0], [4, 0]], theta: 90},
+};
+function runTask(t) {
+  state.show = {L: [true, true, true], combo: true, N: true, proj: true, peaks: true};
+  state.mode = t.mode;
+  if (t.loads) t.loads.forEach(([I, phi], k) => { state.loads[k].I = I; state.loads[k].phi = phi; });
+  if (t.op) state.op = t.op;
+  if (t.pts) setPoints(t.pts);
+  state.theta = clamp(t.theta, 0, W());
+  setMode(t.mode);
+  setPlaying(!!t.play && !reducedMotion.matches);
+  el.scope.scrollIntoView({behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start'});
+}
+
+/* ---------- Hændelser ---------- */
+function localXY(e) { const r = el.cvW.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function hitPeak(x, y, tol) {
+  let best = null, bd = tol;
+  for (const p of peaks) { const d = Math.hypot(p.x - x, p.y - y); if (d <= bd) { bd = d; best = p; } }
+  return best;
+}
+const thetaFromX = x => clamp((x - geo.ML) / geo.pw * geo.Wd, 0, geo.Wd);
+let dragging = false;
+el.cvW.addEventListener('pointerdown', e => {
+  if (!geo) return;
+  const [x, y] = localXY(e);
+  const hit = hitPeak(x, y, e.pointerType === 'mouse' ? 12 : 22);
+  if (hit) { placePoint(hit); e.preventDefault(); return; }
+  dragging = true;
+  try { el.cvW.setPointerCapture(e.pointerId); } catch (err) { /* ignoreres */ }
+  setPlaying(false);
+  state.theta = thetaFromX(x); dirty = true;
+});
+el.cvW.addEventListener('pointermove', e => {
+  if (!geo) return;
+  const [x, y] = localXY(e);
+  if (dragging) { state.theta = thetaFromX(x); dirty = true; return; }
+  if (e.pointerType !== 'mouse') return;
+  const hit = hitPeak(x, y, 12);
+  if (!!hit !== !!hover || (hit && hover && !same(hit, hover))) { hover = hit; dirty = true; }
+  el.cvW.style.cursor = hit ? 'pointer' : 'ew-resize';
+});
+const endDrag = () => { dragging = false; };
+el.cvW.addEventListener('pointerup', endDrag);
+el.cvW.addEventListener('pointercancel', endDrag);
+el.cvW.addEventListener('pointerleave', () => { if (hover) { hover = null; dirty = true; } });
+el.cvW.addEventListener('keydown', e => {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    const d = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 1 : 5);
+    setPlaying(false); state.theta = mod(curTh() + d, W()); dirty = true; e.preventDefault();
+  } else if (e.key === ' ') { setPlaying(!state.playing); e.preventDefault(); }
+});
+
+$('#modeU').addEventListener('click', () => setMode('U'));
+$('#modeI').addEventListener('click', () => setMode('I'));
+el.play.addEventListener('click', () => setPlaying(!state.playing));
+$('#stepBack').addEventListener('click', () => { setPlaying(false); state.theta = mod(curTh() - 15, W()); dirty = true; });
+$('#stepFwd').addEventListener('click', () => { setPlaying(false); state.theta = mod(curTh() + 15, W()); dirty = true; });
+el.thetaRange.addEventListener('input', () => { setPlaying(false); state.theta = +el.thetaRange.value; dirty = true; });
+$('#speedSel').addEventListener('change', e => { state.speed = +e.target.value; });
+$('#perSel').addEventListener('change', e => {
+  state.periods = +e.target.value;
+  el.thetaRange.max = W(); state.theta = curTh();
+  resnap(); update();
+});
+el.uIn.addEventListener('input', () => {
+  const v = parseFloat(el.uIn.value);
+  if (v >= 1 && v <= 1000) { state.U = v; update(); }
+});
+el.legend.addEventListener('change', e => {
+  const k = e.target.dataset.key;
+  if (k) { setShow(k, e.target.checked); dirty = true; }
+});
+el.ptEditor.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const i = +b.closest('.pt-row').dataset.i, P = pts();
+  if ('clear' in b.dataset) P[i] = null;
+  else {
+    const p = P[i] || {k: i, s: 1, th: 180};
+    if (b.dataset.k !== undefined) p.k = +b.dataset.k;
+    if (b.dataset.s !== undefined) p.s = +b.dataset.s;
+    P[i] = p;
+    const other = P[1 - i];
+    snap(p, other ? other.th : p.th);
+  }
+  update();
+});
+el.examples.addEventListener('click', e => {
+  const b = e.target.closest('[data-ex]');
+  if (b) { setPoints(EXAMPLES[+b.dataset.ex].pts); update(); }
+});
+el.opSeg.addEventListener('click', e => {
+  const b = e.target.closest('[data-op]');
+  if (b) { state.op = b.dataset.op; update(); }
+});
+el.presets.addEventListener('click', e => {
+  const b = e.target.closest('[data-preset]');
+  if (!b) return;
+  PRESETS[+b.dataset.preset].loads.forEach(([I, phi], k) => { state.loads[k].I = I; state.loads[k].phi = phi; });
+  resnap(); update();
+});
+el.loads.addEventListener('input', e => {
+  const m = /^([ip])In(\d)$/.exec(e.target.id);
+  if (!m) return;
+  const L = state.loads[+m[2]];
+  if (m[1] === 'i') L.I = +e.target.value; else L.phi = +e.target.value;
+  resnap(); update();
+});
+document.querySelectorAll('[data-task]').forEach(b => b.addEventListener('click', () => runTask(TASKS[b.dataset.task])));
+
+el.palBtn.addEventListener('click', () => {
+  state.palette = state.palette === 'wire' ? 'contrast' : 'wire';
+  store.set('palette', state.palette); applyLook(); buildLegend();
+});
+el.bigBtn.addEventListener('click', () => { state.big = !state.big; store.set('big', state.big); applyLook(); });
+const effTheme = () => root.dataset.theme || (darkMQ.matches ? 'dark' : 'light');
+el.themeBtn.addEventListener('click', () => { root.dataset.theme = effTheme() === 'dark' ? 'light' : 'dark'; });
+function applyLook() {
+  root.dataset.palette = state.palette;
+  root.classList.toggle('big', state.big);
+  el.palBtn.textContent = state.palette === 'wire' ? 'Farver: ledning' : 'Farver: kontrast';
+  el.bigBtn.setAttribute('aria-pressed', state.big);
+}
+function syncThemeBtn() { el.themeBtn.textContent = effTheme() === 'dark' ? 'Lyst tema' : 'Mørkt tema'; }
+
+new MutationObserver(() => { readColors(); syncThemeBtn(); }).observe(root, {attributes: true, attributeFilter: ['data-theme', 'data-palette', 'class']});
+darkMQ.addEventListener('change', () => { readColors(); syncThemeBtn(); });
+const ro = new ResizeObserver(() => { dirty = true; });
+ro.observe(el.pWrap); ro.observe(el.wWrap);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dirty = true; });
+
+/* ---------- Udtryk må ikke deles over to linjer ----------
+   Mellemrum omkring regnetegn, mellem tal og enhed og efter sin/cos gøres hårde (U+00A0) i alle tekstområder. */
+const NB = ' ';
+const reOp = / ([=≈≤≥·×−+/→]) /g;
+const reUnit = /(\d) (V|A|mA|Ω|kΩ|MΩ|mΩ|ms|s|Hz|W|kW|kV|kVA|mm²|%)(?![\wæøåÆØÅ])/g;
+const reFn = /\b(sin|cos) (?=\d)/g;
+function hardSpaces(root) {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => n.parentNode && n.parentNode.closest('svg, script, style, select, textarea') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+  });
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const t = n.nodeValue.replace(reOp, `${NB}$1${NB}`).replace(reUnit, `$1${NB}$2`).replace(reFn, `$1${NB}`);
+    if (t !== n.nodeValue) n.nodeValue = t;
+  }
+}
+// Indholdet i panelerne skrives om ved hver opdatering, så de holdes øje med
+const hardObserver = new MutationObserver(recs => {
+  const done = new Set();
+  for (const r of recs) if (!done.has(r.target)) { done.add(r.target); hardSpaces(r.target); }
+});
+document.querySelectorAll('.theory, .tasks, .foot, #result, #neutralCard, #instInsp, #viewDocs, #instTasks, #instLog, #instHelp').forEach(x => {
+  hardSpaces(x);
+  hardObserver.observe(x, {childList: true, subtree: true});
+});
+
+/* ---------- Start ---------- */
+el.examples.innerHTML = 'Eksempler:' + EXAMPLES.map((x, i) => ` <button type="button" class="ghost" data-ex="${i}">${x.label}</button>`).join('');
+buildEditor(); buildLoads();
+$('#perSel').value = state.periods;
+el.thetaRange.max = W();
+applyLook(); readColors(); syncThemeBtn();
+setMode('U'); setPlaying(false);
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (state.playing) { state.theta = mod(curTh() + dt * state.speed * 360, W()); dirty = true; }
+  if (dirty) { dirty = false; drawAll(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+<script src="install-model.js"></script>
+<script src="install-charts.js"></script>
+<script src="install-view.js"></script>
+<script src="install-inspector.js"></script>
+<script src="install-tasks.js"></script>
+<script src="install-docs.js"></script>
+</body>
+</html>
