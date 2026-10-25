@@ -112,20 +112,24 @@ app.touchV = owner => {
 };
 
 /* ---------- Beregning ---------- */
-app.recompute = () => {
+// Tekst til hændelsesloggen og til viserdiagrammets afspilning af kaskaden
+app.eventText = e => {
+  if (e.type === 'burn') return {type: 'burn', id: e.app.id, sel: `app:${e.app.id}`, name: M.APPL_BY_ID[e.app.type].name, text: `brændte af (${app.where(e.app.id)}, ${e.lbl}, ${fmt(e.v, 0)} V)`};
+  if (e.type === 'mcb') return {type: 'mcb', id: e.g.id, I: e.I, sel: `group:${e.g.id}`, name: `${e.prot} i ${e.owner.name} · ${e.g.name}`, text: `udløste (${U.fmtS(e.I)} A)`};
+  if (e.type === 'afdd') return {type: 'afdd', id: e.g.id, sel: `group:${e.g.id}`, name: `AFDD i ${e.owner.name} · ${e.g.name}`, text: `udløste (${e.kind === 'ARC-S' ? 'serielysbue' : 'parallel lysbue'}, ${U.fmtS(e.I)} A)`};
+  if (e.type === 'rdcdd') return {type: 'rdcdd', id: e.app.id, sel: `app:${e.app.id}`, name: `${M.APPL_BY_ID[e.app.type].name} i ${e.owner.name}`, text: `stoppede på DC-overvågningen (${fmt(e.I * 1000, 0)} mA glat DC)`};
+  return {type: 'rcd', id: e.owner.id, sel: `${app.idx[e.owner.id].type}:${e.owner.id}`, name: `HPFI i ${e.owner.name}`, text: `udløste (${e.dc ? 'glat DC' : 'fejlstrøm'} ${fmt(e.I * 1000, 0)} mA)`};
+};
+// Hver beregning får et nyt nummer, så viserdiagrammet kan se, om det er lige efter en ændring
+app.gen = 0;
+app.solve = () => {
   reindex();
   app.fixPhases();
   app.res = M.compute(app.net, app.opts);
-  for (const e of app.res.events) {
-    const t = e.at;
-    if (e.type === 'burn') app.eventLog.push({type: 'burn', id: e.app.id, sel: `app:${e.app.id}`, t, name: M.APPL_BY_ID[e.app.type].name, text: `brændte af (${app.where(e.app.id)}, ${e.lbl}, ${fmt(e.v, 0)} V)`});
-    else if (e.type === 'mcb') app.eventLog.push({type: 'mcb', id: e.g.id, I: e.I, sel: `group:${e.g.id}`, t, name: `${e.prot} i ${e.owner.name} · ${e.g.name}`, text: `udløste (${U.fmtS(e.I)} A)`});
-    else if (e.type === 'afdd') app.eventLog.push({type: 'afdd', id: e.g.id, sel: `group:${e.g.id}`, t, name: `AFDD i ${e.owner.name} · ${e.g.name}`, text: `udløste (${e.kind === 'ARC-S' ? 'serielysbue' : 'parallel lysbue'}, ${U.fmtS(e.I)} A)`});
-    else if (e.type === 'rdcdd') app.eventLog.push({type: 'rdcdd', id: e.app.id, sel: `app:${e.app.id}`, t, name: `${M.APPL_BY_ID[e.app.type].name} i ${e.owner.name}`, text: `stoppede på DC-overvågningen (${fmt(e.I * 1000, 0)} mA glat DC)`});
-    else app.eventLog.push({type: 'rcd', id: e.owner.id, sel: `${app.idx[e.owner.id].type}:${e.owner.id}`, t, name: `HPFI i ${e.owner.name}`, text: `udløste (${e.dc ? 'glat DC' : 'fejlstrøm'} ${fmt(e.I * 1000, 0)} mA)`});
-  }
-  app.render();
+  app.gen++;
+  for (const e of app.res.events) app.eventLog.push(Object.assign(app.eventText(e), {t: e.at}));
 };
+app.recompute = () => { app.solve(); app.render(); };
 app.fmtT = t => t < 1 ? `${fmt(t * 1000, 0)} ms` : `${fmt(t, 1)} s`;
 app.fmtI = v => v == null || !isFinite(v) ? '—' : v >= 1000 ? `${fmt(v / 1000, 2)} kA` : `${fmt(v, 0)} A`;
 app.showIk = true;
@@ -134,12 +138,13 @@ const ikLine = id => {
   const x = app.res.ik()[id];
   return x ? `<span class="ik-l">Ik,min ${app.fmtI(x.ik1n)}</span>` : '';
 };
-app.render = () => {
+// keepInspector: kun diagram og overblik tegnes igen, fx mens der trækkes i en skyder i inspektøren
+app.render = keepInspector => {
   if (app.sel && !app.idx[app.sel.id] && app.sel.type !== 'cable') app.sel = null;
   if (app.sel && app.sel.type === 'cable' && !app.idx[app.sel.id]) app.sel = null;
   renderSummary();
   renderNet();
-  if (app.renderInspector) app.renderInspector();
+  if (app.renderInspector && !keepInspector) app.renderInspector();
 };
 app.select = (type, id, reveal) => { app.sel = {type, id}; app.render(); if (reveal) app.reveal(); };
 // Rul diagrammet vandret, så det valgte er synligt
@@ -365,11 +370,18 @@ app.resetTrips = () => {
   tavler().forEach(o => { o.rcdTripped = false; o.groups.forEach(g => { g.tripped = false; g.apps.forEach(a => { a.dcTripped = false; }); }); });
   app.eventLog = app.eventLog.filter(e => e.type === 'burn');
 };
-app.load = (net, nulling = true) => { app.net = net; app.opts.nulling = nulling; app.eventLog = []; app.sel = null; };
-// Er transformerkredsen ikke udlagt til nulling, skal alle installationer være TT med jordspyd
+app.load = (net, nulling = true) => { app.net = net; app.eventLog = []; app.sel = null; app.setNulling(nulling); };
+// Er transformerkredsen ikke udlagt til nulling, er alle installationer TT med jordspyd (se app.earthingOf).
+// Bygningens eget valg huskes, så den bliver TN-C-S igen, hvis transformeren igen udlægges til nulling.
 app.setNulling = on => {
   app.opts.nulling = on;
-  if (!on) app.net.forEach(f => f.buildings.forEach(b => { b.earthing = 'TT'; }));
+  const cb = $('#instNulling');
+  if (cb) cb.checked = on;
+};
+app.loadScenario = key => {
+  const s = M.SCENARIOS[key];
+  app.load(s.make(), s.nulling !== false);
+  $('#instScenario').value = key;
 };
 
 function onClick(e) {
@@ -405,8 +417,12 @@ app.openDoc = id => {
 
 app.start = () => {
   const sc = $('#instScenario');
-  sc.innerHTML = Object.entries(M.SCENARIOS).map(([k, s]) => `<option value="${k}">${esc(s.name)}</option>`).join('');
-  sc.addEventListener('change', () => { const s = M.SCENARIOS[sc.value]; app.load(s.make(), s.nulling !== false); app.recompute(); });
+  // Skabelonerne grupperes efter, om transformerkredsen er udlagt til nulling
+  const opts = on => Object.entries(M.SCENARIOS).filter(([, s]) => (s.nulling !== false) === on).map(([k, s]) => `<option value="${k}">${esc(s.name)}</option>`).join('');
+  sc.innerHTML = `<optgroup label="Transformer udlagt til nulling">${opts(true)}</optgroup><optgroup label="Transformer ikke udlagt til nulling (kun TT)">${opts(false)}</optgroup>`;
+  sc.value = 'standard';
+  sc.addEventListener('change', () => { app.loadScenario(sc.value); app.recompute(); });
+  $('#instNulling').addEventListener('change', e => { app.setNulling(e.target.checked); app.recompute(); });
   $('#instBurn').addEventListener('change', e => { app.opts.burn = e.target.checked; app.recompute(); });
   $('#instProt').addEventListener('change', e => { app.opts.prot = e.target.checked; app.recompute(); });
   $('#instIk').addEventListener('change', e => { app.showIk = e.target.checked; app.render(); });
@@ -420,6 +436,7 @@ app.start = () => {
   $('#instNet').addEventListener('click', onClick);
   $('#instLog').addEventListener('click', onClick);
   for (const [k, [, tab]] of Object.entries(TABS)) $(tab).addEventListener('click', () => showTab(k));
+  app.setNulling(M.SCENARIOS.standard.nulling);
   app.sel = {type: 'unit', id: app.net[1].buildings[0].units[0].id};
   const fromHash = Object.keys(TABS).find(k => '#' + TABS[k][2] === location.hash);
   showTab(fromHash || 'theory');

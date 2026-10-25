@@ -23,6 +23,8 @@ function niceMax(m) {
 }
 
 /* Viserdiagram for en tavle: fasepunkterne, nulpunktet N og PE, målt mod fjern jord */
+/* Viserdiagram for en tavle: trekanten L1–L2–L3, tavlens nulpunkt N med spændingerne som pile og det ideelle nulpunkt.
+   o.trail er nulpunktets tidligere positioner (ældste først). Forskydningen tegnes som en stiplet blå pil. */
 function phasorSVG(o) {
   const pts = [...o.corners.map(c => c.p), o.n, o.ideal].concat(o.pe ? [o.pe] : []);
   const ext = Math.max(260, ...pts.map(p => Math.hypot(p.re, p.im) * 1.12));
@@ -31,8 +33,25 @@ function phasorSVG(o) {
   let s = `<svg viewBox="0 0 300 292" class="phasor" role="img" aria-label="Viserdiagram for spændingerne i tavlen">`;
   s += `<circle cx="${cx}" cy="${cy}" r="${r1(M.U_NOM * S)}" fill="none" stroke="var(--grid)" stroke-dasharray="3 4"/>`;
   if (o.corners.length === 3) s += `<polygon points="${o.corners.map(c => `${X(c.p)},${Y(c.p)}`).join(' ')}" fill="var(--panel-2)" stroke="var(--line)"/>`;
+  // Nulpunktets spor: nyere stykker er tydeligere
+  if (o.trail && o.trail.length) {
+    const tr = o.trail.concat([o.n]), m = tr.length - 1;
+    for (let i = 1; i <= m; i++) {
+      const a = tr[i - 1], b = tr[i];
+      if (Math.hypot(X(a) - X(b), Y(a) - Y(b)) < 0.3) continue;
+      s += `<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="var(--n)" stroke-width="1.6" stroke-linecap="round" stroke-opacity="${r1(0.15 + 0.55 * i / m)}"/>`;
+    }
+    o.trail.forEach((p, i) => { if (p.dot) s += `<circle cx="${X(p)}" cy="${Y(p)}" r="2.6" fill="var(--n)" fill-opacity="${r1(0.25 + 0.5 * (i + 1) / tr.length)}"/>`; });
+  }
   // ideelt nulpunkt
   s += `<circle cx="${X(o.ideal)}" cy="${Y(o.ideal)}" r="5" fill="none" stroke="var(--muted)" stroke-dasharray="2 2"/>`;
+  // Forskydningen fra det ideelle nulpunkt til N
+  const dx = X(o.n) - X(o.ideal), dy = Y(o.n) - Y(o.ideal), dl = Math.hypot(dx, dy);
+  if (dl > 14) {
+    const ux = dx / dl, uy = dy / dl, x1 = X(o.n) - ux * 7, y1 = Y(o.n) - uy * 7;
+    s += `<line x1="${X(o.ideal)}" y1="${Y(o.ideal)}" x2="${r1(x1)}" y2="${r1(y1)}" stroke="var(--n)" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+    s += `<polygon points="${r1(x1 + ux * 2)},${r1(y1 + uy * 2)} ${r1(x1 - ux * 6 - uy * 3.5)},${r1(y1 - uy * 6 + ux * 3.5)} ${r1(x1 - ux * 6 + uy * 3.5)},${r1(y1 - uy * 6 - ux * 3.5)}" fill="var(--n)"/>`;
+  }
   for (const c of o.corners) {
     const x0 = X(o.n), y0 = Y(o.n), x1 = X(c.p), y1 = Y(c.p), L = Math.hypot(x1 - x0, y1 - y0);
     if (L > 4) {
@@ -40,7 +59,9 @@ function phasorSVG(o) {
       s += `<line x1="${x0}" y1="${y0}" x2="${r1(x1 - ux * hl * .8)}" y2="${r1(y1 - uy * hl * .8)}" stroke="${PHC[c.k]}" stroke-width="2.6" stroke-linecap="round"/>`;
       s += `<polygon points="${x1},${y1} ${r1(x1 - ux * hl - uy * hw)},${r1(y1 - uy * hl + ux * hw)} ${r1(x1 - ux * hl + uy * hw)},${r1(y1 - uy * hl - ux * hw)}" fill="${PHC[c.k]}"/>`;
     }
-    const lx = r1(x1 + (L > 4 ? (x1 - x0) / L : 0) * 18), ly = r1(y1 + (L > 4 ? (y1 - y0) / L : 0) * 14);
+    // Navnet står uden for trekanten, i retning væk fra midten
+    const ox = x1 - cx, oy = y1 - cy, ol = Math.hypot(ox, oy) || 1;
+    const lx = r1(x1 + ox / ol * 22), ly = r1(y1 + oy / ol * 14);
     s += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle" class="ph-lbl" fill="${PHC[c.k]}">L${c.k + 1} ${fmt(c.v, 0)} V</text>`;
   }
   if (o.pe) {

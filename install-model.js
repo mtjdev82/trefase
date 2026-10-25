@@ -208,8 +208,60 @@ const unit = (name, supply, groups, cab, feed = 'main') => {
 };
 const ks = (name, cab, buildings) => ({id: nid('k'), name, cable: cab, buildings});
 
+/* Skabeloner. nulling fortæller, om transformerkredsen er udlagt til nulling. Er den det, kan bygningerne få PEN
+   fremført fra kabelskabet (TN-C-S). Er den ikke det, skal hver bygning have sin egen jordelektrode (TT). */
+const husNet = (earthing, RA) => [
+  ks('Kabelskab 1', cable('Al150', 80), [
+    house('Hus 1', earthing, [
+      group('Lys', 'L1', ['led', 'gloede']),
+      group('Stue', 'L2', ['tv', 'router', 'konsol']),
+      group('Køkken', 'L3', ['koleskab', 'mikro', 'kaffe']),
+      group('Komfur', '3', ['komfur']),
+    ], null, RA),
+  ]),
+];
+const etageNet = (earthing, RA) => [
+  ks('Kabelskab 1', cable('Al150', 120), [
+    etage('Etageejendom', earthing, [group('Trappelys', 'L2', ['led'])], [
+      unit('Lejlighed 1', '3', [
+        group('Køkken', 'L1', ['elkedel', 'mikro']),
+        group('Stue', 'L2', ['tv', 'router']),
+        group('Værelse', 'L3', ['laptop', 'led']),
+      ], cable('Cu16', 8)),
+      unit('Lejlighed 2', 'L1', [group('Alle rum', 'L1', ['router', 'tv', 'koleskab', 'led'])], cable('Cu10', 11)),
+      unit('Lejlighed 3', 'L2', [group('Alle rum', 'L2', ['elkedel', 'koleskab', 'led'])], cable('Cu10', 14)),
+      unit('Lejlighed 4', 'L3', [group('Alle rum', 'L3', ['router', 'laptop', 'mobil', 'led'])], cable('Cu10', 17)),
+    ], null, RA),
+  ]),
+];
+// Stuen har tre faser. Herover går to faser og nul op i to stigeledninger: L1+L3 i venstre side og L1+L2 i højre side.
+const opgangNet = (earthing, split) => {
+  const chain = (list) => { list.forEach((u, i) => { if (i) u.feed = list[i - 1].id; }); return list; };
+  const left = chain([
+    unit('1. tv', ['L1', 'L3'], [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L3', ['tv', 'router', 'led']), group('Bad', ['L1', 'L3'], ['vvb400'], cable('Cu2.5', 10))], cable('Cu10', 9)),
+    unit('2. tv', ['L1', 'L3'], [group('Køkken', 'L3', ['kaffe', 'koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'laptop', 'led', 'router'])], cable('Cu10', 3)),
+    unit('3. tv', ['L1', 'L3'], [group('Køkken', 'L1', ['koleskab', 'elkedel']), group('Stue', 'L3', ['tv', 'router', 'mobil'])], cable('Cu10', 3)),
+    unit('4. tv', ['L1', 'L3'], [group('Køkken', 'L3', ['koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'router', 'led'])], cable('Cu10', 3)),
+  ]);
+  const right = chain([
+    unit('1. th', ['L1', 'L2'], [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L2', ['tv', 'router', 'led']), group('Kogeplade', ['L1', 'L2'], ['induktion'], cable('Cu2.5', 10))], cable('Cu10', 9)),
+    unit('2. th', ['L1', 'L2'], [group('Køkken', 'L2', ['koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'router', 'laptop', 'led'])], cable('Cu10', 3)),
+    unit('3. th', ['L1', 'L2'], [group('Køkken', 'L1', ['elkedel', 'kaffe']), group('Stue', 'L2', ['router', 'tv', 'mobil']), group('Bad', ['L1', 'L2'], ['vvb400'], cable('Cu2.5', 10))], cable('Cu10', 3)),
+    unit('4. th', ['L1', 'L2'], [group('Køkken', 'L1', ['koleskab', 'elkedel']), group('Stue', 'L2', ['tv', 'router', 'mobil'])], cable('Cu10', 3)),
+  ]);
+  return [ks('Kabelskab 1', cable('Al150', 80), [
+    etage('Opgang', earthing, [group('Trappelys', 'L1', ['led'])], [
+      unit('St. tv', '3', [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L2', ['tv', 'router']), group('Værelse', 'L3', ['laptop', 'led']), group('Komfur', '3', ['komfur'])], cable('Cu16', 6)),
+      unit('St. th', '3', [group('Køkken', 'L2', ['koleskab', 'mikro']), group('Stue', 'L3', ['tv', 'konsol', 'router']), group('Bad', 'L1', ['vask']), group('Sauna', '3', ['sauna'])], cable('Cu16', 6)),
+      ...left, ...right,
+    ], cable('Al95', 15), earthing === 'TT' ? 15 : 25, split),
+  ])];
+};
 const SCENARIOS = {
-  standard: {name: 'To huse og en etageejendom', make: () => [
+  hus: {name: 'Hus med nulling (TN-C-S)', nulling: true, make: () => husNet('TNCS', 25)},
+  etage4: {name: 'Etageejendom med nulling (PEN deles i hovedtavlen)', nulling: true, make: () => etageNet('TNCS', 25)},
+  opgang: {name: 'Opgang med nulling i lejlighederne (2 faser)', nulling: true, make: () => opgangNet('TNCS', 'local')},
+  standard: {name: 'To huse og en etageejendom (Hus 2 har valgt TT)', nulling: true, make: () => [
     ks('Kabelskab 1', cable('Al150', 150), [
       house('Hus 1', 'TNCS', [
         group('Lys', 'L1', ['led', 'router', 'mobil']),
@@ -235,7 +287,7 @@ const SCENARIOS = {
       ]),
     ]),
   ]},
-  tohuse: {name: 'To huse på samme kabel', make: () => [
+  tohuse: {name: 'To huse på samme kabel', nulling: true, make: () => [
     ks('Kabelskab 1', cable('Al150', 120), [
       house('Hus 1', 'TNCS', [
         group('Køkken', 'L1', ['elkedel', 'koleskab']),
@@ -251,64 +303,20 @@ const SCENARIOS = {
       ]),
     ]),
   ]},
-  harm: {name: 'Kontor med mange SMPS', make: () => [
+  harm: {name: 'Kontor med mange SMPS', nulling: true, make: () => [
     ks('Kabelskab 1', cable('Al150', 100), [
       etage('Kontorhus', 'TNCS', [], [
         unit('Kontor', '3', ['L1', 'L2', 'L3'].map((L, i) => group(`Arbejdspladser ${i + 1}`, L, ['laptop', 'laptop', 'laptop', 'tv', 'led', 'led', 'router', 'mobil'])), cable('Cu16', 25)),
       ]),
     ]),
   ]},
-  etage4: {name: 'Etageejendom med fire lejligheder', make: () => [
-    ks('Kabelskab 1', cable('Al150', 120), [
-      etage('Etageejendom', 'TNCS', [group('Trappelys', 'L2', ['led'])], [
-        unit('Lejlighed 1', '3', [
-          group('Køkken', 'L1', ['elkedel', 'mikro']),
-          group('Stue', 'L2', ['tv', 'router']),
-          group('Værelse', 'L3', ['laptop', 'led']),
-        ], cable('Cu16', 8)),
-        unit('Lejlighed 2', 'L1', [group('Alle rum', 'L1', ['router', 'tv', 'koleskab', 'led'])], cable('Cu10', 11)),
-        unit('Lejlighed 3', 'L2', [group('Alle rum', 'L2', ['elkedel', 'koleskab', 'led'])], cable('Cu10', 14)),
-        unit('Lejlighed 4', 'L3', [group('Alle rum', 'L3', ['router', 'laptop', 'mobil', 'led'])], cable('Cu10', 17)),
-      ]),
-    ]),
-  ]},
-  opgang: {name: 'Opgang med stigeledninger (2 faser)', make: () => {
-    // Stuen har tre faser. Herover går to faser og nul op i to stigeledninger: L1+L3 i venstre side og L1+L2 i højre side.
-    const chain = (list) => { list.forEach((u, i) => { if (i) u.feed = list[i - 1].id; }); return list; };
-    const left = chain([
-      unit('1. tv', ['L1', 'L3'], [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L3', ['tv', 'router', 'led']), group('Bad', ['L1', 'L3'], ['vvb400'], cable('Cu2.5', 10))], cable('Cu10', 9)),
-      unit('2. tv', ['L1', 'L3'], [group('Køkken', 'L3', ['kaffe', 'koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'laptop', 'led', 'router'])], cable('Cu10', 3)),
-      unit('3. tv', ['L1', 'L3'], [group('Køkken', 'L1', ['koleskab', 'elkedel']), group('Stue', 'L3', ['tv', 'router', 'mobil'])], cable('Cu10', 3)),
-      unit('4. tv', ['L1', 'L3'], [group('Køkken', 'L3', ['koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'router', 'led'])], cable('Cu10', 3)),
-    ]);
-    const right = chain([
-      unit('1. th', ['L1', 'L2'], [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L2', ['tv', 'router', 'led']), group('Kogeplade', ['L1', 'L2'], ['induktion'], cable('Cu2.5', 10))], cable('Cu10', 9)),
-      unit('2. th', ['L1', 'L2'], [group('Køkken', 'L2', ['koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'router', 'laptop', 'led'])], cable('Cu10', 3)),
-      unit('3. th', ['L1', 'L2'], [group('Køkken', 'L1', ['elkedel', 'kaffe']), group('Stue', 'L2', ['router', 'tv', 'mobil']), group('Bad', ['L1', 'L2'], ['vvb400'], cable('Cu2.5', 10))], cable('Cu10', 3)),
-      unit('4. th', ['L1', 'L2'], [group('Køkken', 'L1', ['koleskab', 'elkedel']), group('Stue', 'L2', ['tv', 'router', 'mobil'])], cable('Cu10', 3)),
-    ]);
-    return [ks('Kabelskab 1', cable('Al150', 80), [
-      etage('Opgang', 'TNCS', [group('Trappelys', 'L1', ['led'])], [
-        unit('St. tv', '3', [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L2', ['tv', 'router']), group('Værelse', 'L3', ['laptop', 'led']), group('Komfur', '3', ['komfur'])], cable('Cu16', 6)),
-        unit('St. th', '3', [group('Køkken', 'L2', ['koleskab', 'mikro']), group('Stue', 'L3', ['tv', 'konsol', 'router']), group('Bad', 'L1', ['vask']), group('Sauna', '3', ['sauna'])], cable('Cu16', 6)),
-        ...left, ...right,
-      ], cable('Al95', 15), 25, 'local'),
-    ])];
-  }},
-  landsby: {name: 'Område uden nulling (jordspyd)', nulling: false, make: () => [
+  husTT: {name: 'Hus uden nulling (TT, jordspyd)', nulling: false, make: () => husNet('TT', 40)},
+  etageTT: {name: 'Etageejendom uden nulling (TT, fælles jordspyd)', nulling: false, make: () => etageNet('TT', 15)},
+  opgangTT: {name: 'Opgang uden nulling (TT, 2 faser)', nulling: false, make: () => opgangNet('TT', 'main')},
+  landsby: {name: 'To huse på landet (TT)', nulling: false, make: () => [
     ks('Kabelskab 1', cable('Al95', 250), [
       house('Gården', 'TT', [group('Køkken', 'L1', ['elkedel', 'koleskab']), group('Stue', 'L2', ['tv', 'router', 'led']), group('Værksted', '3', ['sauna'], cable('Cu2.5', 25)), group('Varmepumpe', '3', ['varmepumpe'])], cable('Al50', 40), 60),
       house('Huset ved vejen', 'TT', [group('Køkken', 'L3', ['kaffe', 'koleskab', 'mikro']), group('Stue', 'L1', ['tv', 'laptop', 'led']), group('Bad', ['L1', 'L2'], ['vvb400'], cable('Cu2.5', 10))], cable('Al25', 30), 120),
-    ]),
-  ]},
-  hus: {name: 'Ét hus', make: () => [
-    ks('Kabelskab 1', cable('Al150', 80), [
-      house('Hus 1', 'TNCS', [
-        group('Lys', 'L1', ['led', 'gloede']),
-        group('Stue', 'L2', ['tv', 'router', 'konsol']),
-        group('Køkken', 'L3', ['koleskab', 'mikro', 'kaffe']),
-        group('Komfur', '3', ['komfur']),
-      ]),
     ]),
   ]},
 };
@@ -378,6 +386,10 @@ function build(feeders, nulling = true) {
       def.perPhase.forEach((P, i) => { if (P > 0) mk(G[PH[i]], star, P * scale, PH[i], U_NOM, true); });
     }
   }
+  // Variabel prøvebelastning pr. fase direkte på tavlens skinner (ohmsk), så man kan se nulpunktet flytte sig
+  function addBank(Tv, owner, phases) {
+    if (owner.bank) phases.forEach(L => { const P = owner.bank[PH.indexOf(L)]; if (P > 0 && Tv[L] !== undefined) addZ(Tv[L], Tv.N, U_NOM * U_NOM / P, 0, {kind: 'bank', owner: owner.id, L}); });
+  }
   function addGroups(Tv, groups, owner, allowed = PH) {
     for (const g of groups) {
       const phases = g.phases.filter(p => Tv[p] !== undefined && allowed.includes(p));
@@ -431,6 +443,7 @@ function build(feeders, nulling = true) {
       if (!b.earthBroken) earth[b.id] = addZ(B.PE, -1, b.RA, 0, {kind: 'earth'});
       boards[b.id] = B;
       addGroups(B, b.groups, b);
+      addBank(B, b, PH);
       for (const u of unitOrder(b.units)) {
         // Forsynes fra hovedtavlen eller fra lejligheden nedenunder på samme stigeledning
         const Pn = u.feed !== 'main' && boards[u.feed] ? boards[u.feed] : B;
@@ -447,6 +460,7 @@ function build(feeders, nulling = true) {
         boards[u.id] = U;
         used[u.id] = u.phases;
         addGroups(U, u.groups, u, u.phases);
+        addBank(U, u, u.phases);
       }
     }
     prev = K;
@@ -557,7 +571,7 @@ function netZ(ckt, rf, pairs) {
     if (a >= 0 && b >= 0) { Ar[a * n + b] -= yr; Ai[a * n + b] -= yi; Ar[b * n + a] -= yr; Ai[b * n + a] -= yi; }
   };
   for (const b of ckt.br) {
-    if (b.kind === 'leak' || b.kind === 'ins' || b.kind === 'arc' || b.kind === 'fault') continue;
+    if (b.kind === 'leak' || b.kind === 'ins' || b.kind === 'arc' || b.kind === 'fault' || b.kind === 'bank') continue;
     stamp(b.a, b.b, b.kind === 'cable' || b.kind === 'pe' ? b.R * rf : b.R, b.X);
   }
   for (let i = 0; i < n; i++) Ar[i * n + i] += LEAK;
@@ -638,11 +652,13 @@ function residualOf(ckt, V, groups) {
 /* Beregn hele nettet. Efter hver beregning findes det, der sker hurtigst: en gruppeafbryder udløser, en HPFI
    udløser, eller det værst ramte apparat brænder af. Det udføres, og nettet regnes igen (kaskade). */
 function compute(feeders, opts) {
-  const events = [];
+  const events = [], steps = [];
   let ckt, V1, now = 0;
   for (let it = 0; it < 400; it++) {
     ckt = build(feeders, opts.nulling !== false);
     V1 = solve(ckt, 1, ckt.inj);
+    // Hvert trin i kaskaden huskes, så nulpunktets vej kan vises. Knudenumrene er de samme i alle trin.
+    steps.push({at: now, V: V1});
     const cand = [];
     if (opts.burn) {
       let worst = null;
@@ -709,10 +725,10 @@ function compute(feeders, opts) {
     }
     V[h] = inj.length ? solve(ckt, h, inj) : null;
   }
-  return result(ckt, V, events);
+  return result(ckt, V, events, steps);
 }
 
-function result(ckt, V, events) {
+function result(ckt, V, events, steps) {
   const zero = {re: 0, im: 0};
   let ikCache = null;
   const vab = (a, b, h) => V[h] ? vdiff(V[h], a, b) : zero;
@@ -725,7 +741,7 @@ function result(ckt, V, events) {
   };
   const ser = f => HARM.map(h => Object.assign({h}, f(h)));
   return {
-    ckt, events,
+    ckt, events, steps,
     residual: groups => residualOf(ckt, V[1], groups),
     // Kortslutningsstrømme for alle punkter; regnes første gang de bruges
     ik: () => ikCache || (ikCache = shortCircuit(ckt)),

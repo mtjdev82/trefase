@@ -328,6 +328,7 @@ details p{margin:6px 0 0}
 <div id="viewInstall" role="tabpanel" aria-labelledby="tabInstall" hidden>
   <div class="inst-bar">
     <label class="sel">Eksempel <select id="instScenario"></select></label>
+    <label class="chip" title="Er transformerkredsen ikke udlagt til nulling, skal alle bygninger have jordspyd (TT)"><input type="checkbox" id="instNulling" checked> Transformer udlagt til nulling</label>
     <label class="chip"><input type="checkbox" id="instBurn" checked> Udstyr kan brænde af</label>
     <label class="chip"><input type="checkbox" id="instProt" checked> Afbrydere og HPFI virker</label>
     <label class="chip"><input type="checkbox" id="instIk" checked> Vis Ik,min</label>
@@ -338,9 +339,10 @@ details p{margin:6px 0 0}
   <details class="quick-help" id="instHelp">
     <summary>Sådan bruger du simulatoren</summary>
     <ol>
+      <li><b>Vælg et eksempel.</b> Eksemplerne er delt efter, om transformeren er udlagt til nulling. Med nulling kan bygningerne få PEN fra kabelskabet (TN-C-S). Uden nulling har alle bygninger jordspyd (TT). Det kan også skiftes med "Transformer udlagt til nulling".</li>
       <li><b>Klik</b> på en tavle, et kabel, en gruppe eller en brugsgenstand. Panelet til højre viser spændinger, strømme, harmoniske og forklaringer.</li>
       <li><b>Lav en fejl.</b> "Manglende nul" på en tavle afbryder nullen før tavlen. I et kabels panel kan du afbryde L1, L2, L3, N eller PE. I en gruppes panel kan du indsætte en isolationsfejl.</li>
-      <li><b>Se konsekvensen.</b> Spændingerne i diagrammet farves efter status, hændelsesloggen viser afbrydere og udstyr, der brænder af, og viserdiagrammet viser, hvor nulpunktet er flyttet hen.</li>
+      <li><b>Se konsekvensen.</b> Spændingerne i diagrammet farves efter status, hændelsesloggen viser afbrydere og udstyr, der brænder af, og viserdiagrammet viser, hvor nulpunktet er flyttet hen. Med skyderne under diagrammet kan du ændre belastningen på hver fase og se nulpunktet flytte sig.</li>
       <li><b>Mål</b> med installationstesteren i tavlens eller gruppens panel: spænding, R ISO, R LOW, Z line, Z loop, HPFI, lækstrøm, R<sub>E</sub> og jordfejl. I tavlens indstillinger vælger du HPFI-type, og på en gruppe kan du montere en AFDD.</li>
       <li><b>Prøv opgaverne</b> under diagrammet, eller læs mere i <button type="button" class="link" data-doc="doc-start">vejledningen</button>.</li>
     </ol>

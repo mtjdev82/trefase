@@ -138,7 +138,12 @@ const SECTIONS = [
     <p>PE er kun forbundet til bygningens egen jordelektrode. Fejlstrømmen skal gennem R<sub>E</sub>, jorden og R<sub>B</sub>, så den bliver typisk få ampere. Det er for lidt til gruppeafbryderen, så beskyttelsen sker med HPFI. Kravet er R<sub>E</sub> · I<sub>ΔN</sub> ≤ 50 V, altså højst ca. 1667 Ω ved 30 mA.</p>
     <p>Fordelen er, at PE ikke følger nullen. Brydes nullen i stikledningen, ændrer spændingerne mellem fase og nul sig, men PE bliver i ro.</p>
     <h3>Hvornår må man bruge nulling?</h3>
-    <p>Det er ikke alle steder i Danmark, at nulling (TN) er tilladt. Det afhænger af, om netselskabet har udlagt transformerkredsen til nulling. Er den ikke det, skal installationerne have jordspyd (TT) og beskyttes med HPFI. I simulatoren vælges det på transformeren: står "Udlagt til nulling" til nej, bliver alle bygninger TT, og TN-C-S og lokal nulling kan ikke vælges. Eksemplet "Område uden nulling" viser det.</p>`],
+    <p>Det er ikke alle steder i Danmark, at nulling (TN) er tilladt. Det afhænger af, om netselskabet har udlagt transformerkredsen til nulling. Er den ikke det, skal installationerne have jordspyd (TT) og beskyttes med HPFI.</p>
+    <ul>
+      <li><b>Transformer udlagt til nulling:</b> Bygningen <i>kan</i> få PEN fremført fra kabelskabet og dele den i N og PE i hovedtavlen (TN-C-S). I en etageejendom kan PEN også fortsætte op i stigeledningerne til lejlighederne (lokal nulling). Bygningen kan stadig vælge sin egen jordelektrode (TT).</li>
+      <li><b>Transformer ikke udlagt til nulling:</b> Stikledningen har kun N, ikke PEN. Hver bygning skal have sin egen jordelektrode, og PE går fra hovedtavlen ud til grupperne og op i stigeledningerne til lejlighederne.</li>
+    </ul>
+    <p>I simulatoren vælges det med "Transformer udlagt til nulling" i værktøjslinjen eller i transformerens panel. Slås det fra, bliver alle bygninger TT, og TN-C-S og lokal nulling kan ikke vælges. Slås det til igen, får bygningerne deres eget valg tilbage. Eksemplerne er delt i to grupper: med nulling (hus, etageejendom og opgang med TN-C-S) og uden nulling (de samme bygninger med jordspyd).</p>`],
 
   ['doc-stige', 'Stigeledninger, faser og lokal nulling', `
     <p>I en etageejendom fordeles strømmen fra hovedtavlen op i opgangen med stigeledninger. Mange ældre ejendomme har ikke tre faser i alle lejligheder. Ofte har lejlighederne i stuen tre faser, mens en stigeledning med to faser og nul går op gennem hver side af opgangen. Lejlighederne på den ene side kan fx have L1 og L2, og på den anden side L1 og L3.</p>
@@ -168,6 +173,21 @@ const SECTIONS = [
     <p>Når nullen brydes, er apparaterne på de tre faser i stedet koblet i stjerne med et flydende stjernepunkt. Stjernepunktet lægger sig, hvor strømmene fra de tre faser går i nul, og det bestemmes af apparaternes impedanser:</p>
     <div class="eq"><span>U<sub>N</sub> = (Y<sub>1</sub>·U<sub>1</sub> + Y<sub>2</sub>·U<sub>2</sub> + Y<sub>3</sub>·U<sub>3</sub>) / (Y<sub>1</sub> + Y<sub>2</sub> + Y<sub>3</sub>)</span><span>Y = 1/Z for belastningen på hver fase (Millmans sætning)</span></div>
     <p>Stjernepunktet trækkes mod den fase, der er mest belastet (lavest impedans). Den fase får lav spænding, mens de let belastede faser nærmer sig hovedspændingen på 400 V. Viserdiagrammet i tavlens panel viser det direkte: den blå prik N flytter sig væk fra midten af trekanten.</p>
+    <h3>Viserdiagrammet: se nulpunktet flytte sig</h3>
+    <p>Trekantens hjørner er L1, L2 og L3. Afstanden mellem to hjørner er hovedspændingen, ca. 400 V, og den ligger fast, fordi transformeren holder den. Den stiplede cirkel har radius 230 V, og den stiplede ring i midten er nulpunktet, når nullen er i orden. Den blå prik er tavlens nulpunkt N. Pilene fra N ud til hjørnerne er de spændinger, apparaterne på hver fase får, og den stiplede blå pil er nulpunktsforskydningen.</p>
+    <p>Med en hel nul sidder N fast i midten, uanset belastningen. Uden nul kan N flytte sig frit inde i trekanten, og belastningen bestemmer, hvor den lander:</p>
+    <div class="doc-tw"><table class="doc-t">
+      <thead><tr><th>Belastning (uden nul)</th><th>Hvor lander N?</th><th>U<sub>1</sub></th><th>U<sub>2</sub></th><th>U<sub>3</sub></th></tr></thead>
+      <tbody>
+        <tr><td>Kun L1</td><td>I hjørnet L1</td><td>0 V</td><td>400 V</td><td>400 V</td></tr>
+        <tr><td>L2 og L3 lige meget, L1 ingenting</td><td>Midt på linjen L2–L3</td><td>346 V</td><td>200 V</td><td>200 V</td></tr>
+        <tr><td>L1 4 kW, L2 og L3 1 kW hver</td><td>Tæt på L1</td><td>116 V</td><td>306 V</td><td>306 V</td></tr>
+        <tr><td>Lige meget på alle tre</td><td>I midten</td><td>230 V</td><td>230 V</td><td>230 V</td></tr>
+      </tbody>
+    </table></div>
+    <p>Den sidste linje er grunden til, at en symmetrisk 3-faset belastning, fx en varmepumpe, ikke behøver nul. Tallet 346 V er højden i trekanten, 400 V · √3/2.</p>
+    <p>I tavlens panel kan du trække i skyderne "Ekstra ohmsk belastning" for hver fase og se N flytte sig, mens du trækker. Den blå streg viser vejen, N har taget. Med "Sluk tavlens apparater" er det kun skyderne, der bestemmer belastningen, og så kan tallene i tabellen genfindes. Lige efter en ændring, fx når nullen afbrydes, glider N fra den gamle position til den nye. Brænder apparater af, eller udløser afbrydere, stopper N ved hvert trin i kaskaden, og hændelsen står under diagrammet. "Afspil kaskaden igen" viser forløbet en gang til.</p>
+    <p>Er bygningen TN-C-S, er PE forbundet til N i hovedtavlen. Den grønne prik PE følger så N, når PEN brydes, og afstanden fra midten til PE er berøringsspændingen. I TT bliver PE i midten.</p>
     <h3>Eksempel: Lejlighed 1</h3>
     <p>L1 har elkedel og kaffemaskine (3 kW, ca. 18 Ω). L2 og L3 har kun router, oplader, LED og TV (ca. 100–150 W hver, flere hundrede ohm). Når nullen i stigeledningen brydes, falder L1 til under 50 V, mens L2 og L3 stiger til 360–380 V.</p>
     <h3>Hvorfor udstyr brænder af</h3>

@@ -64,20 +64,146 @@ function voltTable(owner) {
     rows.push(row('N–PE', `${fmt(npe, 1)} V`, npe > 50 ? 'burn' : npe > 10 ? 'tol' : ''));
     rows.push(row('PE–jord (U<sub>B</sub>)', `${fmt(pe, 1)} V`, pe >= 50 ? 'burn' : pe >= 25 ? 'tol' : ''));
   }
-  return table(rows);
+  return `<div data-volt="${owner}">${table(rows)}</div>`;
 }
-function phasor(owner) {
-  const r = app.res, B = r.ckt.boards[owner], T = r.ckt.boards.trafo;
-  const corners = app.usedPhases(owner).map(L => ({k: +L[1] - 1, p: v1(B[L]), v: M.rms(r.vSeries(B[L], B.N))}));
-  const n = v1(B.N), pe = B.PE !== undefined ? v1(B.PE) : null;
+/* ---------- Viserdiagram: nulpunktets bevægelse ----------
+   Pr. tavle huskes det sidst viste billede, nulpunktets spor og den sidste kaskade. Lige efter en ændring glider
+   N fra den gamle position gennem kaskadens trin (apparater, der brænder af, afbrydere, der udløser) til den nye. */
+const PMEM = {};
+// shown: den tavle, panelet viser nu. wasShown: den, det viste ved forrige tegning.
+let pending = null, anim = 0, shown = null, wasShown = null;
+const pt = (V, i) => i < 0 ? {re: 0, im: 0} : {re: V.re[i], im: V.im[i]};
+const dist = (a, b) => Math.hypot(a.re - b.re, a.im - b.im);
+const lerp = (a, b, f) => ({re: a.re + (b.re - a.re) * f, im: a.im + (b.im - a.im) * f});
+const kW = P => `${fmt(P / 1000, 1)} kW`;
+function snapAt(owner, V) {
+  const B = app.res.ckt.boards[owner], n = pt(V, B.N);
+  const corners = app.usedPhases(owner).map(L => { const p = pt(V, B[L]); return {k: +L[1] - 1, p, v: dist(p, n)}; });
   const ideal = corners.length === 3
     ? {re: corners.reduce((a, c) => a + c.p.re, 0) / 3, im: corners.reduce((a, c) => a + c.p.im, 0) / 3}
-    : v1(T.N);
-  const shift = Math.hypot(n.re - ideal.re, n.im - ideal.im);
-  const txt = shift > 15
-    ? 'Nullederen holder ikke længere stjernepunktet på plads. Den fase, der er mindst belastet, får den højeste spænding.'
-    : 'Nulpunktet ligger, hvor det skal.';
-  return `<div class="phasor-wrap">${U.phasorSVG({corners, n, pe, ideal})}<p class="cap">Nulpunktsforskydning <b class="num">${fmt(shift, 0)} V</b>. ${txt} Den blå prik er N, den stiplede cirkel er det ideelle nulpunkt, og pilene er spændingerne mod N. ${more('doc-nul')}</p></div>`;
+    : pt(V, app.res.ckt.boards.trafo.N);
+  return {corners, n, pe: B.PE !== undefined ? pt(V, B.PE) : null, ideal};
+}
+function finalSnap(owner) {
+  const r = app.res, B = r.ckt.boards[owner], s = snapAt(owner, r.steps[r.steps.length - 1].V);
+  s.corners.forEach(c => { c.v = M.rms(r.vSeries(B['L' + (c.k + 1)], B.N)); });   // RMS med harmoniske, som i tabellen
+  return s;
+}
+const sameShape = (a, b) => !!a && a.corners.length === b.corners.length && a.corners.every((c, i) => c.k === b.corners[i].k);
+const lerpSnap = (a, b, f) => ({
+  corners: b.corners.map((c, i) => ({k: c.k, p: lerp(a.corners[i].p, c.p, f), v: a.corners[i].v + (c.v - a.corners[i].v) * f})),
+  n: lerp(a.n, b.n, f), pe: a.pe && b.pe ? lerp(a.pe, b.pe, f) : b.pe, ideal: lerp(a.ideal, b.ideal, f),
+});
+// Billederne fra før ændringen, lige efter den og efter hver hændelse i kaskaden, der flytter noget i denne tavle
+function cascadeKeys(owner, from, fin) {
+  const r = app.res, keys = [{s: from}];
+  r.steps.forEach((st, i) => {
+    const last = i === r.steps.length - 1, s = last ? fin : snapAt(owner, st.V), prev = keys[keys.length - 1].s;
+    if (dist(prev.n, s.n) > 1.5 || s.corners.some((c, j) => Math.abs(c.v - prev.corners[j].v) > 3)) keys.push({s, ev: i ? r.events[i - 1] : null, at: st.at});
+    else if (last && keys.length > 1) keys[keys.length - 1].s = s;
+  });
+  return keys.length > 1 ? keys : null;
+}
+const addTrail = (mem, p, dot) => { mem.trail.push({re: p.re, im: p.im, dot}); if (mem.trail.length > 400) mem.trail.splice(0, mem.trail.length - 400); };
+function phasorCap(s) {
+  const shift = dist(s.n, s.ideal);
+  return `Nulpunktsforskydning <b class="num">${fmt(shift, 0)} V</b>. ${shift > 15
+    ? 'Nulpunktet er trukket mod den mest belastede fase. Den fase, der er mindst belastet, får den højeste spænding.'
+    : 'Nulpunktet ligger, hvor det skal.'}`;
+}
+function drawPhasor(owner, s, trail) {
+  const box = insp.querySelector(`[data-phasor="${owner}"]`);
+  if (!box) return false;
+  box.querySelector('.ph-svg').innerHTML = U.phasorSVG(Object.assign({trail}, s));
+  box.querySelector('.ph-cap').innerHTML = phasorCap(s);
+  return true;
+}
+const evCap = k => {
+  if (!k.ev) return 'Lige efter ændringen';
+  const t = app.eventText(k.ev);
+  return `<b class="num">${app.fmtT(k.at)}</b> ${esc(t.name)} ${esc(t.text)}`;
+};
+function play(owner, keys, base) {
+  const token = ++anim, GLIDE = 600, HOLD = 500;
+  const evEl = () => insp.querySelector(`[data-phasor="${owner}"] .ph-ev`);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const el = evEl();
+    drawPhasor(owner, keys[keys.length - 1].s, PMEM[owner].trail);
+    if (el && keys.length > 2) el.innerHTML = `${keys.length - 2} hændelse${keys.length > 3 ? 'r' : ''} i kaskaden. Se hændelsesloggen.`;
+    return;
+  }
+  let seg = 1, t0 = performance.now();
+  const step = now => {
+    if (token !== anim) return;
+    const k = keys[seg], f = Math.min(1, (now - t0) / GLIDE), e = 0.5 - Math.cos(Math.PI * f) / 2;
+    const passed = keys.slice(0, seg).map(x => ({re: x.s.n.re, im: x.s.n.im, dot: true}));
+    if (!drawPhasor(owner, lerpSnap(keys[seg - 1].s, k.s, e), base.concat(passed))) return;
+    const el = evEl();
+    if (el) el.innerHTML = evCap(k);
+    if (now - t0 >= GLIDE + (k.ev ? HOLD : 120)) {
+      if (++seg >= keys.length) { drawPhasor(owner, k.s, PMEM[owner].trail); return; }
+      t0 = now;
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function phasor(owner, extra = '') {
+  const mem = PMEM[owner] || (PMEM[owner] = {trail: [], gen: -1, snap: null, keys: null});
+  const fin = finalSnap(owner);
+  let keys = null, first = fin, base = null;
+  if (!sameShape(mem.snap, fin)) mem.trail = [];
+  else if (wasShown === owner && mem.gen === app.gen - 1 && (keys = cascadeKeys(owner, mem.snap, fin))) {
+    // Én beregning siden sidst: animér. Sporet gemmes med det samme, så en ny tegning midt i animationen ikke mister det.
+    base = mem.trail.slice();
+    keys.slice(0, -1).forEach(k => addTrail(mem, k.s.n, true));
+    mem.keys = keys.some(k => k.ev) ? {keys, base} : null;
+    first = keys[0].s;
+    pending = {owner, keys, base};
+  } else if (mem.gen !== app.gen && dist(mem.snap.n, fin.n) > 0.5) addTrail(mem, mem.snap.n, true);
+  mem.snap = fin; mem.gen = app.gen; shown = owner;
+  const tools = `<button type="button" class="ghost" data-pact="clear" data-id="${owner}">Ryd spor</button>${mem.keys ? `<button type="button" class="ghost" data-pact="replay" data-id="${owner}">Afspil kaskaden igen</button>` : ''}`;
+  return `<div class="phasor-wrap" data-phasor="${owner}"><div class="ph-svg">${U.phasorSVG(Object.assign({trail: base || mem.trail}, first))}</div>
+    <p class="ph-ev" aria-live="polite"></p>
+    <p class="cap"><span class="ph-cap">${phasorCap(first)}</span> Den blå prik er tavlens nulpunkt N, og pilene er de spændinger, apparaterne får. Den stiplede cirkel er nulpunktet, når nullen er i orden. Den blå streg er nulpunktets spor. ${more('doc-nul')}</p>
+    ${extra}<div class="btns">${tools}</div></div>`;
+}
+// Strømmen ind i tavlen pr. leder
+function inCurrents(owner) {
+  const c = app.res.ckt.cables[owner];
+  if (!c) return '';
+  const parts = [...app.usedPhases(owner), 'N'].map(k => `${k} ${c.br[k] === undefined ? 'afbrudt' : `${fmtS(M.rms(app.res.brSeries(c.br[k])))} A`}`);
+  return `Strøm ind i tavlen: ${parts.join(' · ')}`;
+}
+// Prøvebelastning pr. fase og tænd/sluk for tavlens egne apparater
+function loadCtl(o) {
+  const bank = o.bank || [0, 0, 0], own = o.groups.flatMap(g => g.apps), anyOn = own.some(a => a.on);
+  const rows = app.usedPhases(o.id).map(L => {
+    const i = M.PH.indexOf(L);
+    return `<label class="bank-row w-${L}"><span class="bank-l"><i class="wdot w-${L}"></i>${L}</span><input type="range" min="0" max="5000" step="100" value="${bank[i]}" data-bank="${i}" data-id="${o.id}" aria-label="Ekstra belastning på ${L}"><output class="num" data-bank-out="${i}">${kW(bank[i])}</output></label>`;
+  }).join('');
+  return `<div class="bank"><p class="bank-h">Ekstra ohmsk belastning på skinnerne <span class="muted">(som et varmelegeme)</span></p>${rows}
+    <p class="bank-i num" data-bank-i>${inCurrents(o.id)}</p>
+    <div class="btns">${own.length ? btn(anyOn ? 'Sluk tavlens apparater' : 'Tænd tavlens apparater', 'appsOnOff', o.id) : ''}${bank.some(x => x) ? btn('Fjern ekstra belastning', 'bankReset', o.id) : ''}</div>
+    <p class="hint">Træk i skyderne og se nulpunktet flytte sig. Med nullen i orden står det næsten stille. Afbryd nullen med knappen ovenfor, og prøv igen. Sluk tavlens apparater, hvis kun skyderne skal bestemme belastningen.</p></div>`;
+}
+// Mens der trækkes i en skyder: regn nettet igen og opdatér kun diagrammet, tabellen og strømmene
+function liveUpdate(owner) {
+  app.solve();
+  app.render(true);
+  const mem = PMEM[owner], fin = finalSnap(owner);
+  anim++;
+  if (!mem) return;
+  if (sameShape(mem.snap, fin)) { if (dist(mem.snap.n, fin.n) > 0.3) addTrail(mem, mem.snap.n, false); }
+  else mem.trail = [];
+  mem.snap = fin; mem.gen = app.gen;
+  drawPhasor(owner, fin, mem.trail);
+  const ev = insp.querySelector(`[data-phasor="${owner}"] .ph-ev`);
+  if (ev) ev.innerHTML = '';
+  const vt = insp.querySelector(`[data-volt="${owner}"]`);
+  if (vt) vt.outerHTML = voltTable(owner);
+  const bi = insp.querySelector('[data-bank-i]');
+  if (bi) bi.textContent = inCurrents(owner);
 }
 function voltScope(owner) {
   const r = app.res, B = r.ckt.boards[owner];
@@ -336,7 +462,8 @@ function inspBoard(o, kind) {
   return head(isB ? (o.kind === 'hus' ? 'Hus · hovedtavle' : 'Etageejendom · hovedtavle') : 'Lejlighed · undertavle', o.name) +
     intro(isB ? (app.isLocal(o) ? INTRO.local : INTRO[app.earthingOf(o)]) : INTRO.unit + (app.isLocal(app.find(o.id).bldg) ? ' ' + INTRO.nullet : ''), isB ? 'doc-jording' : 'doc-stige') +
     sec('', nButton(o, isB) + earthBtn + rcdRow + peWarn) +
-    sec('Spændinger', voltTable(o.id)) + sec('', phasor(o.id)) + sec('', voltScope(o.id)) + ikSection(o.id, kind) +
+    sec('Nulpunkt og belastning', phasor(o.id, loadCtl(o))) +
+    sec('Spændinger', voltTable(o.id)) + sec('', voltScope(o.id)) + ikSection(o.id, kind) +
     meter(o.id, kind) +
     sec('Indstillinger', `<div class="fields">${set}</div>`) +
     sec('', `<div class="btns">${btn(isB ? 'Vis stikledning' : 'Vis stigeledning', 'selCable', o.id)}${acts}</div>`);
@@ -505,6 +632,7 @@ function inspApp(a) {
 
 app.renderInspector = () => {
   const el = $('#instInsp'), s = app.sel;
+  wasShown = shown; shown = null;
   let h = '';
   if (!s) h = `<div class="insp-empty"><h2>Klik på noget i diagrammet</h2><p>Vælg en tavle, et kabel, en gruppe eller en brugsgenstand for at se spændinger, strømme og harmoniske. Afbryd en leder for at se, hvad der sker.</p></div>`;
   else if (s.type === 'trafo') h = inspTrafo();
@@ -514,7 +642,9 @@ app.renderInspector = () => {
     h = s.type === 'ks' ? inspKs(e.obj) : s.type === 'bldg' ? inspBoard(e.obj, 'bldg') : s.type === 'unit' ? inspBoard(e.obj, 'unit')
       : s.type === 'group' ? inspGroup(e.obj) : inspApp(e.obj);
   }
+  anim++;
   el.innerHTML = h;
+  if (pending) { const p = pending; pending = null; play(p.owner, p.keys, p.base); }
 };
 
 /* ---------- Handlinger i inspektøren ---------- */
@@ -525,6 +655,8 @@ const IACT = {
   delGroup: id => { const e = app.find(id); e.owner.groups = e.owner.groups.filter(g => g.id !== id); app.sel = null; },
   delApp: id => { const e = app.find(id); e.group.apps = e.group.apps.filter(a => a.id !== id); app.sel = {type: 'group', id: e.group.id}; },
   toggleOn: id => { const a = app.find(id).obj; a.on = !a.on; },
+  appsOnOff: id => { const o = app.find(id).obj, apps = o.groups.flatMap(g => g.apps), on = !apps.some(a => a.on); apps.forEach(a => { a.on = on; }); },
+  bankReset: id => { app.find(id).obj.bank = null; },
   repair: id => { app.find(id).obj.burned = false; app.eventLog = app.eventLog.filter(x => x.id !== id); },
   untrip: id => { app.find(id).obj.tripped = false; app.eventLog = app.eventLog.filter(x => x.id !== id); },
   trip: id => { app.find(id).obj.tripped = true; },
@@ -583,6 +715,14 @@ insp.addEventListener('click', ev => {
     app.renderInspector();
     return;
   }
+  const pa = ev.target.closest('[data-pact]');
+  if (pa) {
+    const id = pa.dataset.id, mem = PMEM[id];
+    if (!mem) return;
+    if (pa.dataset.pact === 'clear') { mem.trail = []; anim++; drawPhasor(id, mem.snap, []); }
+    else if (mem.keys) play(id, mem.keys.keys, mem.keys.base);
+    return;
+  }
   const b = ev.target.closest('[data-iact]');
   if (!b) return;
   const name = b.dataset.iact, id = b.dataset.id;
@@ -591,8 +731,26 @@ insp.addEventListener('click', ev => {
   IACT[name](id, b.dataset.c);
   app.recompute();
 });
+// Prøvebelastningens skydere regner live og tegner kun diagrammet. Når skyderen slippes, tegnes panelet helt.
+insp.addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.dataset.bank === undefined) return;
+  const o = app.find(t.dataset.id).obj;
+  o.bank = (o.bank || [0, 0, 0]).slice();
+  o.bank[+t.dataset.bank] = +t.value;
+  const out = insp.querySelector(`[data-bank-out="${t.dataset.bank}"]`);
+  if (out) out.textContent = kW(+t.value);
+  liveUpdate(t.dataset.id);
+});
 insp.addEventListener('change', ev => {
   const t = ev.target;
+  if (t.dataset.bank !== undefined) {
+    const k = t.dataset.bank;
+    app.render();
+    const n = insp.querySelector(`[data-bank="${k}"]`);
+    if (n) n.focus({preventScroll: true});
+    return;
+  }
   if (t.dataset.mset === 'rf') { app.meter.rf = +t.value; app.renderInspector(); return; }
   const f = t.dataset.field;
   if (!f) return;

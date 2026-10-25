@@ -155,7 +155,16 @@
 .wdot{display:inline-block;width:14px;height:4px;border-radius:2px;background:var(--c);margin-right:6px;vertical-align:middle}
 .wdot.w-PE{background:repeating-linear-gradient(90deg,var(--pe-g) 0 4px,var(--pe-y) 4px 8px)}
 .phasor-wrap{display:grid;gap:6px}
-.phasor{width:100%;max-width:300px;justify-self:center;display:block}
+.phasor{width:100%;max-width:340px;justify-self:center;display:block}
+.ph-svg{display:grid}
+.ph-ev{margin:0;min-height:1.35em;font-size:.86em;text-align:center;color:var(--ink)}
+.bank{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
+.bank-h{margin:0;font-size:.88em;font-weight:600}
+.bank-row{display:grid;grid-template-columns:3.2em minmax(0,1fr) 4.4em;align-items:center;gap:8px;font-size:.88em}
+.bank-l{white-space:nowrap;font-weight:600}
+.bank-row input{accent-color:var(--c);width:100%;min-width:0}
+.bank-row output{text-align:right;white-space:nowrap}
+.bank-i{margin:0;font-size:.82em;color:var(--muted)}
 .ph-lbl{font:700 11px var(--font-body)}
 .cap{font-size:.86em;color:var(--muted)}
 .cap b{color:var(--ink)}
