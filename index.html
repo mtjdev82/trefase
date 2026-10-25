@@ -86,7 +86,7 @@ h1{font-family:var(--font-display);font-weight:700;font-size:clamp(2rem, 1.3rem 
 /* Scope + panel */
 .bench{display:grid;gap:18px;grid-template-columns:minmax(0,1fr)}
 @media (min-width:1180px){.bench{grid-template-columns:minmax(0,1fr) 380px;align-items:start}}
-.scope{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:12px;min-width:0;scroll-margin-top:12px}
+.scope{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:12px;min-width:0;scroll-margin-top:12px;container:scope / inline-size}
 .canvases{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 #pWrap{flex:0 0 var(--H);height:var(--H);max-width:100%}
 #wWrap{flex:1 1 360px;height:var(--H);min-width:0}
@@ -98,14 +98,47 @@ canvas{display:block;width:100%;height:100%;touch-action:pan-y}
 #timeOut{min-width:13em;font-size:.92em}
 .sel{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:.9em}
 select,input[type="number"]{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+/* Indstillinger under kurverne: etiketter i én kolonne, så knapperne står lige under hinanden */
+.opts{--row:34px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 14px;align-items:start}
+.opt-l{min-height:var(--row);display:flex;align-items:center;font-family:var(--font-mono);font-size:.74em;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.opt-v{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;min-width:0}
+.opts .seg button{min-height:calc(var(--row) - 6px)}
+.opts .chip,.opts .sw{min-height:var(--row)}
+.opt-u{font-size:.86em;color:var(--muted)}
 .legend{display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 11px 3px 8px;font-size:.9em;cursor:pointer;user-select:none}
-.chip input{margin:0;accent-color:var(--ink)}
-.chip:has(input:not(:checked)){opacity:.5}
+.aids{display:flex;flex-wrap:wrap;gap:6px 14px}
+/* Kurve til/fra: en pille i kurvens farve med flueben, når kurven vises */
+.chip{--c:var(--ink);display:inline-flex;align-items:center;gap:7px;min-height:30px;border:1px solid var(--line);border-radius:999px;padding:3px 12px 3px 6px;font-size:.9em;background:var(--panel);color:var(--muted);cursor:pointer;user-select:none;transition:background-color .15s,border-color .15s,color .15s}
+.chip:has(:checked){color:var(--ink);background:color-mix(in srgb, var(--c) 11%, var(--panel));border-color:color-mix(in srgb, var(--c) 50%, var(--line))}
+.chip input,.sw input{appearance:none;-webkit-appearance:none;margin:0;flex:none;cursor:pointer}
+.chip input{width:1.3em;height:1.3em;border-radius:50%;border:2px solid color-mix(in srgb, var(--c) 75%, transparent);display:grid;place-content:center;transition:background-color .15s}
+.chip input:checked{background:var(--c);border-color:var(--c)}
+.chip input::before{content:"";width:.66em;height:.66em;background:var(--panel);clip-path:polygon(14% 44%,0 65%,50% 100%,100% 16%,80% 0,43% 62%);transform:scale(0);transition:transform .12s}
+.chip input:checked::before{transform:scale(1)}
+/* Indstilling til/fra: kontakt */
+.sw{display:inline-flex;align-items:center;gap:8px;min-height:30px;font-size:.9em;cursor:pointer;user-select:none}
+.sw input{position:relative;width:2.1em;height:1.2em;border-radius:999px;background:var(--line);transition:background-color .15s}
+.sw input::before{content:"";position:absolute;top:2px;left:2px;width:calc(1.2em - 4px);height:calc(1.2em - 4px);border-radius:50%;background:var(--panel);box-shadow:0 1px 2px rgb(0 0 0 / .3);transition:transform .15s}
+.sw input:checked{background:var(--ink)}
+.sw input:checked::before{transform:translateX(.9em)}
+.chip input:focus-visible,.sw input:focus-visible{outline:none}
+.chip:has(input:focus-visible),.sw:has(input:focus-visible){outline:2px solid var(--combo);outline-offset:2px;border-radius:999px}
+@media (prefers-reduced-motion:reduce){.chip,.chip input,.chip input::before,.sw input,.sw input::before{transition:none}}
+/* På en smal telefon står etiketterne over knapperne. Er der god plads, står tempo og visning på samme linje. */
+@container scope (max-width:430px){
+  .opts{grid-template-columns:minmax(0,1fr);gap:4px}
+  .opt-l{min-height:0}
+  .opt-v + .opt-l{margin-top:8px}
+}
+@container scope (min-width:900px){
+  .opts{grid-template-columns:max-content auto max-content minmax(0,1fr)}
+  .opt-wide{grid-column:2 / -1}
+  #perLbl{margin-left:18px}
+}
 .dot{width:.78em;height:.78em;border-radius:50%;background:var(--c);display:inline-block;flex:none;box-shadow:0 0 0 1px color-mix(in srgb, var(--ink) 20%, transparent)}
 .readouts{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:6px}
 .ro{background:var(--panel-2);border-radius:8px;padding:6px 10px;display:grid}
-.ro-l{font-size:.82em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.ro-l{font-size:.82em;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
 .ro-v{font-size:1.05em;font-weight:500}
 .hint{margin:0;color:var(--muted);font-size:.88em}
 
@@ -220,22 +253,29 @@ details p{margin:6px 0 0}
       <button type="button" id="stepFwd" class="ghost" aria-label="15 grader frem">+15°</button>
       <label class="range-wrap"><span class="sr">Tidsmarkør</span><input type="range" id="thetaRange" min="0" max="720" step="1" value="60"></label>
       <output id="timeOut" class="num"></output>
-      <label class="sel">Tempo
-        <select id="speedSel">
-          <option value="0.1">1 periode = 10 s</option>
-          <option value="0.25" selected>1 periode = 4 s</option>
-          <option value="0.5">1 periode = 2 s</option>
-          <option value="1">1 periode = 1 s</option>
-        </select>
-      </label>
-      <label class="sel">Vis
-        <select id="perSel">
-          <option value="1">1 periode (20 ms)</option>
-          <option value="2">2 perioder (40 ms)</option>
-        </select>
-      </label>
     </div>
-    <div class="legend" id="legend"></div>
+    <div class="opts">
+      <span class="opt-l" id="speedLbl">Tempo</span>
+      <div class="opt-v">
+        <div class="seg" role="group" aria-labelledby="speedLbl" id="speedSeg">
+          <button type="button" data-speed="0.1" aria-label="1 periode varer 10 sekunder">10 s</button>
+          <button type="button" data-speed="0.25" aria-label="1 periode varer 4 sekunder">4 s</button>
+          <button type="button" data-speed="0.5" aria-label="1 periode varer 2 sekunder">2 s</button>
+          <button type="button" data-speed="1" aria-label="1 periode varer 1 sekund">1 s</button>
+        </div>
+        <span class="opt-u">pr. periode</span>
+      </div>
+      <span class="opt-l" id="perLbl">Vis</span>
+      <div class="opt-v">
+        <div class="seg" role="group" aria-labelledby="perLbl" id="perSeg">
+          <button type="button" data-per="1" title="20 ms">1 periode</button>
+          <button type="button" data-per="2" title="40 ms">2 perioder</button>
+        </div>
+        <div class="aids" id="aids"></div>
+      </div>
+      <span class="opt-l">Kurver</span>
+      <div class="opt-v opt-wide legend" id="legend"></div>
+    </div>
     <div class="readouts" id="readouts"></div>
     <p class="hint">Klik på en top (○) for at sætte punkt A og B. Klik på et punkt igen for at fjerne det. Træk i kurverne eller brug ← → for at flytte tidsmarkøren, og mellemrum for at afspille. <button type="button" class="link" data-doc="doc-trefase">Læs mere i vejledningen</button></p>
   </section>
@@ -338,10 +378,10 @@ details p{margin:6px 0 0}
 <div id="viewInstall" role="tabpanel" aria-labelledby="tabInstall" hidden>
   <div class="inst-bar">
     <label class="sel">Eksempel <select id="instScenario"></select></label>
-    <label class="chip" title="Er transformerkredsen ikke udlagt til nulling, skal alle bygninger have jordspyd (TT)"><input type="checkbox" id="instNulling" checked> Transformer udlagt til nulling</label>
-    <label class="chip"><input type="checkbox" id="instBurn" checked> Udstyr kan brænde af</label>
-    <label class="chip"><input type="checkbox" id="instProt" checked> Afbrydere og HPFI virker</label>
-    <label class="chip"><input type="checkbox" id="instIk" checked> Vis Ik,min</label>
+    <label class="sw" title="Er transformerkredsen ikke udlagt til nulling, skal alle bygninger have jordspyd (TT)"><input type="checkbox" role="switch" id="instNulling" checked> Transformer udlagt til nulling</label>
+    <label class="sw"><input type="checkbox" role="switch" id="instBurn" checked> Udstyr kan brænde af</label>
+    <label class="sw"><input type="checkbox" role="switch" id="instProt" checked> Afbrydere og HPFI virker</label>
+    <label class="sw"><input type="checkbox" role="switch" id="instIk" checked> Vis Ik,min</label>
     <button type="button" class="ghost" id="instRestore">Fjern alle fejl</button>
     <button type="button" class="ghost" id="instReset">Slå afbrydere til igen</button>
     <button type="button" class="ghost" id="instRepair">Reparer brændt udstyr</button>
@@ -575,12 +615,13 @@ function drawWave(sc) {
   ctx.clearRect(0, 0, w, h);
   ctx.lineWidth = 1;
 
-  // Lodret gitter hver 30°, tydeligere og med tal hver 90°
+  // Lodret gitter hver 30°, tydeligere hver 90°. Tal hver 90°, eller hver 180° hvis der ikke er plads (fx 2 perioder på en telefon)
+  const lblStep = X(90) - X(0) < fs * 4.6 ? 180 : 90;
   for (let t = 0; t <= Wd + 1e-6; t += 30) {
     const x = Math.round(X(t)) + 0.5, major = t % 90 === 0;
     ctx.strokeStyle = major ? col.line : col.grid;
     seg(ctx, x, MT, x, MT + phH);
-    if (major) {
+    if (t % lblStep === 0) {
       const al = t >= Wd ? 'right' : 'center';
       text(ctx, `${t}°`, x, MT + phH + fs * 1.2, {size: fs, align: al, color: col.ink, weight: 500, mono: true});
       text(ctx, `${fmt(t * MS_PER_DEG, 0)} ms`, x, MT + phH + fs * 2.45, {size: fs * 0.92, align: al, color: col.muted, weight: 500, mono: true});
@@ -765,7 +806,7 @@ function drawAll() {
 const el = {
   cvP: $('#cvP'), cvW: $('#cvW'), pWrap: $('#pWrap'), wWrap: $('#wWrap'), scope: $('#scope'),
   play: $('#playBtn'), thetaRange: $('#thetaRange'), time: $('#timeOut'),
-  legend: $('#legend'), readouts: $('#readouts'), result: $('#result'), neutral: $('#neutralCard'),
+  legend: $('#legend'), aids: $('#aids'), speedSeg: $('#speedSeg'), perSeg: $('#perSeg'), readouts: $('#readouts'), result: $('#result'), neutral: $('#neutralCard'),
   ptEditor: $('#ptEditor'), examples: $('#examples'), presets: $('#presets'), loads: $('#loads'),
   uIn: $('#uIn'), uDerived: $('#uDerived'), opSeg: $('#opSeg'), opNote: $('#opNote'),
   palBtn: $('#palBtn'), bigBtn: $('#bigBtn'), themeBtn: $('#themeBtn'),
@@ -841,7 +882,7 @@ function buildReadouts() {
   else items.push({label: 'i_N = i_1 + i_2 + i_3', c: 'var(--n)', fn: th => val(neutral(), th)});
   const p = pair();
   if (p && !p.same) { const cmb = p.combo; items.push({label: names(p).inst, c: 'var(--combo)', fn: th => val(cmb, th)}); }
-  el.readouts.innerHTML = items.map((it, i) => `<div class="ro"><span class="ro-l"><span class="dot" style="--c:${it.c}"></span>${sub(it.label)}</span><span class="ro-v num" id="ro${i}"></span></div>`).join('');
+  el.readouts.innerHTML = items.map((it, i) => `<div class="ro"><span class="ro-l"><span class="dot" style="--c:${it.c}"></span><span>${sub(it.label)}</span></span><span class="ro-v num" id="ro${i}"></span></div>`).join('');
   roList = items.map((it, i) => ({fn: it.fn, node: $('#ro' + i)}));
 }
 function updateReadouts() {
@@ -866,10 +907,15 @@ function buildLegend() {
   const items = [0, 1, 2].map(k => ({key: 'L' + k, c: `var(--l${k + 1})`, html: `L${k + 1}${wire ? ` <span class="muted">${WIRE[k]}</span>` : ''}`}));
   if (state.mode === 'I') items.push({key: 'N', c: 'var(--n)', html: `i<sub>N</sub>${wire ? ' <span class="muted">blå</span>' : ''}`});
   items.push({key: 'C', c: 'var(--combo)', html: '<span id="comboName"></span>'});
-  items.push({key: 'proj', html: 'Projektionslinjer'});
-  items.push({key: 'peaks', html: 'Toppunkter'});
-  el.legend.innerHTML = items.map(it => `<label class="chip"><input type="checkbox" data-key="${it.key}"${getShow(it.key) ? ' checked' : ''}>${it.c ? `<span class="dot" style="--c:${it.c}"></span>` : ''}${it.html}</label>`).join('');
+  const box = it => `<input type="checkbox" data-key="${it.key}"${getShow(it.key) ? ' checked' : ''}>`;
+  el.legend.innerHTML = items.map(it => `<label class="chip" style="--c:${it.c}">${box(it)}<span>${it.html}</span></label>`).join('');
+  el.aids.innerHTML = [{key: 'proj', html: 'Projektionslinjer'}, {key: 'peaks', html: 'Toppunkter'}]
+    .map(it => `<label class="sw">${box(it).replace('<input', '<input role="switch"')}<span>${it.html}</span></label>`).join('');
   syncLegend();
+}
+function syncOpts() {
+  el.speedSeg.querySelectorAll('[data-speed]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.speed === state.speed));
+  el.perSeg.querySelectorAll('[data-per]').forEach(b => b.setAttribute('aria-pressed', +b.dataset.per === state.periods));
 }
 function syncLegend() {
   const n = $('#comboName'), p = pair();
@@ -1038,9 +1084,14 @@ el.play.addEventListener('click', () => setPlaying(!state.playing));
 $('#stepBack').addEventListener('click', () => { setPlaying(false); state.theta = mod(curTh() - 15, W()); dirty = true; });
 $('#stepFwd').addEventListener('click', () => { setPlaying(false); state.theta = mod(curTh() + 15, W()); dirty = true; });
 el.thetaRange.addEventListener('input', () => { setPlaying(false); state.theta = +el.thetaRange.value; dirty = true; });
-$('#speedSel').addEventListener('change', e => { state.speed = +e.target.value; });
-$('#perSel').addEventListener('change', e => {
-  state.periods = +e.target.value;
+el.speedSeg.addEventListener('click', e => {
+  const b = e.target.closest('[data-speed]');
+  if (b) { state.speed = +b.dataset.speed; syncOpts(); }
+});
+el.perSeg.addEventListener('click', e => {
+  const b = e.target.closest('[data-per]');
+  if (!b) return;
+  state.periods = +b.dataset.per; syncOpts();
   el.thetaRange.max = W(); state.theta = curTh();
   resnap(); update();
 });
@@ -1048,10 +1099,12 @@ el.uIn.addEventListener('input', () => {
   const v = parseFloat(el.uIn.value);
   if (v >= 1 && v <= 1000) { state.U = v; update(); }
 });
-el.legend.addEventListener('change', e => {
+const onShow = e => {
   const k = e.target.dataset.key;
   if (k) { setShow(k, e.target.checked); dirty = true; }
-});
+};
+el.legend.addEventListener('change', onShow);
+el.aids.addEventListener('change', onShow);
 el.ptEditor.addEventListener('click', e => {
   const b = e.target.closest('button');
   if (!b) return;
@@ -1139,7 +1192,7 @@ document.querySelectorAll('.theory, .tasks, .foot, #result, #neutralCard, #instI
 /* ---------- Start ---------- */
 el.examples.innerHTML = 'Eksempler:' + EXAMPLES.map((x, i) => ` <button type="button" class="ghost" data-ex="${i}">${x.label}</button>`).join('');
 buildEditor(); buildLoads();
-$('#perSel').value = state.periods;
+syncOpts();
 el.thetaRange.max = W();
 applyLook(); readColors(); syncThemeBtn();
 setMode('U'); setPlaying(false);

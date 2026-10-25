@@ -303,8 +303,11 @@
 }
 @media (max-width:480px){
   .tabs button{padding:8px 10px;font-size:1.02rem;letter-spacing:.02em}
-  .inst-bar .sel{flex:1 1 100%}
+  .inst-bar{row-gap:4px}
+  .inst-bar .sel{flex:1 1 100%;margin-bottom:4px}
   .inst-bar .sel select{flex:1}
+  .inst-bar .sw{flex:1 1 100%}
+  .inst-bar .ghost{margin-top:4px}
   .insp-h,.insp-sec{padding-left:12px;padding-right:12px}
   .inst-net-wrap{padding:10px}
   .doc-sec{padding:14px 14px}
@@ -314,6 +317,9 @@
   input,select,textarea{font-size:max(16px,1em)!important}
   .app{padding:5px 10px 5px 8px}
   .app-add,.mini-add{min-height:32px;min-width:32px}
-  .chip{padding:6px 12px 6px 9px}
+  .chip,.sw{min-height:36px}
+  .chip{padding:4px 13px 4px 7px}
+  .opts{--row:40px}
+  .opts .seg button{padding-inline:12px}
   .net-zoom button{min-width:40px;height:36px}
 }
