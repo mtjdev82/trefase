@@ -284,8 +284,22 @@ function building(b) {
   }
   return h + '</div></div>';
 }
+// Zoom i diagrammet huskes i browseren (kun en bekvemmelighed)
+app.zoom = (() => { try { return Math.min(1.5, Math.max(0.35, +localStorage.getItem('trefase.zoom') || 1)); } catch (e) { return 1; } })();
+function setZoom(z) {
+  app.zoom = Math.round(Math.min(1.5, Math.max(0.35, z)) * 100) / 100;
+  try { localStorage.setItem('trefase.zoom', app.zoom); } catch (e) { /* ingen lagring */ }
+  renderNet();
+}
+// Tilpas: hele diagrammet i bredden, dog ikke større end 100 %
+function fitZoom() {
+  const wrap = $('#instNet'), net = wrap.querySelector('.net'), cs = getComputedStyle(wrap);
+  const natural = net.getBoundingClientRect().width / app.zoom, room = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  setZoom(Math.min(1, room / natural));
+}
 function renderNet() {
-  let h = `<div class="net"><div class="col"><button type="button" class="box trafo${isSel('trafo', 'trafo')}" data-sel="trafo:trafo">
+  let h = `<div class="net-zoom" role="group" aria-label="Zoom i diagrammet"><button type="button" data-zoom="out" aria-label="Zoom ud">−</button><span>${Math.round(app.zoom * 100)} %</span><button type="button" data-zoom="in" aria-label="Zoom ind">+</button><button type="button" data-zoom="fit">Tilpas</button></div>`;
+  h += `<div class="net" style="zoom:${app.zoom}"><div class="col"><button type="button" class="box trafo${isSel('trafo', 'trafo')}" data-sel="trafo:trafo">
     <span class="box-k">Transformer · ${app.opts.nulling ? 'udlagt til nulling' : 'kun TT (jordspyd)'}</span><span class="box-t">10/0,4 kV · 400 kVA</span>${voltRow('trafo')}${ikLine('trafo')}</button></div>`;
   for (const f of app.net) {
     // Kablet strækkes, så lederne går helt hen til kabelskabet
@@ -384,11 +398,25 @@ app.loadScenario = key => {
   $('#instScenario').value = key;
 };
 
+// Er panelet under diagrammet (smal skærm), hopper siden ned til det, når man vælger noget i diagrammet
+const narrow = () => matchMedia('(max-width: 1179.98px)').matches;
+const motion = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+app.toInspector = () => {
+  const el = $('#instInsp'), r = el.getBoundingClientRect();
+  if (narrow() && (r.top > innerHeight * 0.5 || r.top < 0)) el.scrollIntoView({behavior: motion(), block: 'start'});
+};
+app.toNet = () => { $('#instNet').scrollIntoView({behavior: motion(), block: 'start'}); app.reveal(); };
 function onClick(e) {
+  const z = e.target.closest('[data-zoom]');
+  if (z) { const k = z.dataset.zoom; if (k === 'fit') fitZoom(); else setZoom(app.zoom * (k === 'in' ? 1.25 : 0.8)); return; }
   const a = e.target.closest('[data-act]');
   if (a) { app.act(a.dataset.act, a.dataset.id); return; }
   const s = e.target.closest('[data-sel]');
-  if (s) { const [type, id] = s.dataset.sel.split(':'); app.select(type, id, !!e.target.closest('#instLog')); }
+  if (s) {
+    const [type, id] = s.dataset.sel.split(':'), fromLog = !!e.target.closest('#instLog');
+    app.select(type, id, fromLog);
+    if (!fromLog && e.target.closest('#instNet')) app.toInspector();
+  }
 }
 
 /* ---------- Faner ---------- */

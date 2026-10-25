@@ -8,7 +8,8 @@ const LS = ['L1', 'L2', 'L3'];
 const PROTS = ['B6', 'B10', 'B13', 'B16', 'B20', 'C10', 'C13', 'C16', 'C20'];
 const ZERO = M.HARM.map(h => ({h, re: 0, im: 0}));
 
-const head = (k, title) => `<div class="insp-h"><span class="insp-k">${k}</span><h2>${esc(title)}</h2></div>`;
+// Knappen tilbage til diagrammet vises kun, når panelet ligger under diagrammet (smal skærm)
+const head = (k, title) => `<div class="insp-h"><span class="insp-k">${k}</span><h2>${esc(title)}</h2><button type="button" class="ghost to-net" data-tonet>↑ Tilbage til diagrammet</button></div>`;
 const more = (id, label = 'Læs mere') => `<button type="button" class="link more" data-doc="${id}">${label}</button>`;
 const intro = (text, id) => `<section class="insp-sec"><p class="intro">${text} ${more(id)}</p></section>`;
 const INTRO = {
@@ -706,6 +707,7 @@ const FIELDS = {
 
 const insp = $('#instInsp');
 insp.addEventListener('click', ev => {
+  if (ev.target.closest('[data-tonet]')) { app.toNet(); return; }
   const s = ev.target.closest('[data-isel]');
   if (s) { const [t, id] = s.dataset.isel.split(':'); app.select(t, id, true); return; }
   const ms = ev.target.closest('button[data-mset]');

@@ -100,6 +100,27 @@ const SECTIONS = [
     <h3>Visning</h3>
     <p><b>Farver</b> skifter mellem ledningsfarver (L1 brun, L2 sort, L3 grå, N blå) og kontrastfarver. <b>Projektor</b> gør tekst og grafer større. Temaet kan skiftes mellem lyst og mørkt.</p>`],
 
+  ['doc-mobil', 'Telefon, tablet og app', `
+    <p>Værktøjet virker i browseren på pc, tablet og telefon, både Android og iPhone/iPad. Det kan også installeres som en app på hjemmeskærmen. Så åbner det i sit eget vindue uden browserens adresselinje, og det virker uden net, når det har været åbnet én gang.</p>
+    <h3>Installér på Android</h3>
+    <ol>
+      <li>Åbn siden i Chrome.</li>
+      <li>Tryk på knappen "Installer app" øverst, eller åbn menuen ⋮ og vælg "Installer app" (på nogle telefoner "Føj til startskærm").</li>
+    </ol>
+    <h3>Installér på iPhone og iPad</h3>
+    <ol>
+      <li>Åbn siden i Safari.</li>
+      <li>Tryk på Del-knappen (firkanten med pilen op) og vælg "Føj til hjemmeskærm".</li>
+    </ol>
+    <p>Den installerede app opdaterer sig selv. Når der er forbindelse, hentes den nyeste version, hver gang den åbnes.</p>
+    <h3>Tips til små skærme</h3>
+    <ul>
+      <li><b>Diagrammet</b> rulles vandret med fingeren. Med − og + over diagrammet zoomer du, og "Tilpas" viser hele nettet i bredden.</li>
+      <li><b>Panelet</b> med detaljer ligger under diagrammet. Når du trykker på noget i diagrammet, ruller siden ned til panelet, og "↑ Tilbage til diagrammet" fører dig op igen.</li>
+      <li><b>Vend skærmen</b>, så diagrammet får mere plads. På en tablet på langs, med mindst 1180 pixels i bredden, ligger panelet ved siden af diagrammet som på en pc.</li>
+      <li><b>Lange ligninger</b> knækker ikke. Er de bredere end skærmen, kan de rulles vandret.</li>
+    </ul>`],
+
   ['doc-trefase', 'Trefaset vekselstrøm', `
     <p>Transformeren har tre viklinger, der er forskudt 120° fra hinanden. Spændingerne mod nul er derfor tre sinuskurver, der er forskudt en tredjedel periode (6,67 ms ved 50 Hz).</p>
     <div class="eq"><span>u<sub>1</sub> = Û · sin(ωt), u<sub>2</sub> = Û · sin(ωt − 120°), u<sub>3</sub> = Û · sin(ωt − 240°)</span><span>ω = 2π · 50 Hz ≈ 314 rad/s</span></div>
