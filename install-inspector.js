@@ -47,7 +47,6 @@ const protOf = M.protOf;
 const bldgOf = id => { const e = app.find(id); return e.type === 'bldg' ? e.obj : e.bldg; };
 const earthingOf = id => { const b = bldgOf(id); return b ? app.earthingOf(b) : 'TNCS'; };
 const earthLabel = id => { const b = bldgOf(id); return !b ? 'TN-C-S' : app.isLocal(b) ? 'TN-C med lokal nulling' : app.earthingOf(b) === 'TNCS' ? 'TN-C-S' : 'TT'; };
-const tavleOf = id => { const e = app.find(id); return e.type === 'group' ? e.owner : e.obj; };
 const groupLoad = g => {
   const c = app.res.ckt.cables[g.id];
   return Math.max(0, ...['L1', 'L2', 'L3'].filter(k => c.br[k] !== undefined).map(k => M.h1(app.res.brSeries(c.br[k]))));
@@ -236,8 +235,29 @@ function currentScope(id, title) {
 const FNS = [['U', 'Spænding'], ['RISO', 'R ISO'], ['RLOW', 'R LOW'], ['ZL', 'Z line'], ['ZS', 'Z loop'], ['RCD', 'HPFI'], ['LEAK', 'Lækstrøm'], ['RE', 'R E'], ['FAULT', 'Jordfejl']];
 // Den HPFI, der beskytter målepunktet, og hvad den ser lige nu
 function rcdNow(id) {
-  const tav = tavleOf(id), p = M.rcdParams(tav.name, tav.rcd), rs = app.res.residual(tav.groups);
-  return {tav, p, rs, sens: M.rcdSens(tav.rcdType, p, rs.dc), T: M.RCD_TYPES[tav.rcdType] || M.RCD_TYPES.A};
+  const rc = app.rcdOf(id), p = M.rcdParams(rc.key, rc.dev.rcd), rs = app.res.residual(rc.groups);
+  return Object.assign(rc, {p, rs, sens: M.rcdSens(rc.dev.rcdType, p, rs.dc), T: M.RCD_TYPES[rc.dev.rcdType] || M.RCD_TYPES.A});
+}
+const IdNmA = dev => dev.rcd === '300' ? 300 : 30;
+// Lækstrømmen gennem en HPFI: andelen af I_ΔN, viserne fra hver fase og summen, som HPFI'en ser
+function leakBlock(groups, dev) {
+  const r = app.res, rs = r.residual(groups), mA = rs.ac * 1000, IdN = IdNmA(dev), pct = mA / IdN * 100;
+  const lk = r.leakByPhase(groups), ph = LS.map((L, k) => ({k, I: {re: lk[L].re * 1000, im: lk[L].im * 1000}}));
+  const sum = ph.reduce((a, x) => ({re: a.re + x.I.re, im: a.im + x.I.im}), {re: 0, im: 0});
+  const other = {re: rs.I.re * 1000 - sum.re, im: rs.I.im * 1000 - sum.im};
+  const surge = dev.rcdDelay ? 0 : r.surge(groups) * 1000;
+  const zone = pct < 30 ? ['I orden', 'ok'] : pct < 50 ? ['For høj', 'tol'] : pct < 100 ? ['Kan udløse', 'burn'] : ['Skal udløse', 'burn'];
+  let h = `<div class="leak-box">${U.rcdGaugeSVG(mA, IdN, surge)}
+    <p class="leak-row">Lækstrøm gennem ${dev === groups[0] && groups.length === 1 && M.ownRcd(dev) ? 'afbryderen' : 'HPFI\'en'}: <b class="num">${fmt(mA, mA < 10 ? 1 : 0)} mA</b> = ${fmt(pct, 0)} % af I<sub>ΔN</sub> · <b class="st-${zone[1]} zone">${zone[0]}</b></p>`;
+  if (surge > 0.05) h += `<p class="hint">Tændes alle armaturerne bag den på én gang, ser den kortvarigt ca. <b class="num">${fmt(mA + surge, 0)} mA</b>: lækstrømmen plus indkoblingsspidsen (den hule prik).</p>`;
+  if (dev.rcdDelay) h += `<p class="hint">Korttidsforsinket: den reagerer ikke på de korte indkoblingsspidser, kun på lækstrøm og fejlstrøm, der varer ved.</p>`;
+  if (ph.some(x => Math.hypot(x.I.re, x.I.im) > 1e-3) || mA > 0.05) {
+    const n = ph.filter(x => Math.hypot(x.I.re, x.I.im) > 0.01).length;
+    h += `<figure class="leak-fig">${U.leakSVG({ph, other})}<figcaption>${n > 1
+      ? 'Lækstrømmene fra faserne er forskudt 120° og lægges sammen som visere, ligesom strømmene i nullederen. HPFI\'en ser kun summen.'
+      : 'Lækstrømmen kommer fra én fase. Kommer der lækstrøm fra de andre faser, ophæver den delvist denne.'} ${more('doc-laek')}</figcaption></figure>`;
+  }
+  return h + '</div>';
 }
 const ok = (pass, txt) => `<span class="verdict-pill ${pass ? 'pass' : 'fail'}">${pass ? '✓' : '✗'} ${txt}</span>`;
 const big = (label, val, unit) => `<div class="m-big"><span>${label}</span><b class="num">${val}</b><small>${unit}</small></div>`;
@@ -290,10 +310,10 @@ function meter(id, kind) {
     out += ok(MO >= 1, MO >= 1 ? 'R ISO ≥ 1,0 MΩ' : 'Under kravet på 1,0 MΩ');
     out += `<p class="m-note">Målingen forudsætter, at installationen er spændingsløs, og at brugsgenstande er frakoblet. Simulatoren regner, som om de er.${groups.length > 1 ? ` Her måles ${groups.length} grupper på én gang. Mål på grupperne hver for sig for at finde fejlen.` : ''}</p>`;
   } else if (m.fn === 'RCD') {
-    const tav = tavleOf(id), rpe = M.cabs(r.zIn(P.PE, -1));
-    if (tav.rcd === 'none') out += `<p class="m-note">Der er ingen HPFI i ${esc(tav.name)}.</p>`;
+    const rc = app.rcdOf(id), tav = rc.dev, rpe = M.cabs(r.zIn(P.PE, -1));
+    if (tav.rcd === 'none') out += `<p class="m-note">Der er ingen HPFI foran målepunktet. ${esc(tav.name)} har ingen fælles HPFI.</p>`;
     else {
-      const p = M.rcdParams(tav.name, tav.rcd), Uc = p.IdN * rpe, mA = fmt(p.IdN * 1000, 0);
+      const p = M.rcdParams(rc.key, tav.rcd), Uc = p.IdN * rpe, mA = fmt(p.IdN * 1000, 0);
       out += big('U<sub>c</sub>', Uc > 999 ? '>999' : fmt(Uc, 1), 'V');
       out += small(`Ved I<sub>ΔN</sub> = ${mA} mA`, `R<sub>PE</sub> ≈ ${rpe > 1e4 ? '>10 kΩ' : `${fmtA(rpe)} Ω`}`);
       out += ok(Uc <= 50, Uc <= 50 ? 'U<sub>c</sub> ≤ 50 V' : 'U<sub>c</sub> over 50 V');
@@ -312,7 +332,7 @@ function meter(id, kind) {
         out += ok(x1 && x5 && p.t1 <= 0.3 && p.t5 <= 0.04, x1 ? 'Udløsetider overholdt' : 'Udløser ikke ved I<sub>ΔN</sub>');
         if (sens.status === 'nedsat') out += `<p class="m-note">Glat DC på ${fmt(rs.dc * 1000, 0)} mA har nedsat følsomheden.</p>`;
       }
-      out += `<p class="m-note">Simuleret HPFI, ${T.name}, ${mA} mA i ${esc(tav.name)}. Krav: ≤ 300 ms ved 1 × I<sub>ΔN</sub> og ≤ 40 ms ved 5 × I<sub>ΔN</sub>.</p>`;
+      out += `<p class="m-note">Simuleret ${rc.own ? `${esc(app.rcdName(tav))} i gruppen ${esc(tav.name)}` : `HPFI i ${esc(tav.name)}`}, ${T.name}, ${mA} mA${tav.rcdDelay ? ', korttidsforsinket' : ''}. Krav: ≤ 300 ms ved 1 × I<sub>ΔN</sub> og ≤ 40 ms ved 5 × I<sub>ΔN</sub>.</p>`;
     }
   } else if (m.fn === 'RLOW') {
     if (e.type === 'bldg') out += `<p class="m-note">Målepunktet er hovedjordklemmen. Vælg en gruppe eller en undertavle for at måle PE-lederens kontinuitet derfra.</p>`;
@@ -323,11 +343,11 @@ function meter(id, kind) {
       out += ok(R < 2, R < 2 ? 'Gennemgående PE' : 'Høj modstand');
     }
   } else if (m.fn === 'LEAK') {
-    const groups = e.type === 'group' ? [e.obj] : tavleOf(id).groups, rs = app.res.residual(groups);
-    const tav = tavleOf(id), IdN = tav.rcd === '300' ? 0.3 : 0.03, pct = rs.ac / IdN * 100;
+    const rc = app.rcdOf(id), groups = e.type === 'group' ? [e.obj] : rc.groups, rs = app.res.residual(groups);
+    const tav = rc.dev, IdN = IdNmA(tav) / 1000, pct = rs.ac / IdN * 100, ownN = e.type === 'group' ? 0 : e.obj.groups.length - groups.length;
     out += rs.ac >= 1 ? big('I<sub>Δ</sub>', fmtA(rs.ac), 'A') : big('I<sub>Δ</sub>', fmt(rs.ac * 1000, 2), 'mA');
     out += small('Glat DC', `${fmt(rs.dc * 1000, 1)} mA`);
-    out += small('Målt om', e.type === 'group' ? `gruppens fase- og nulleder` : `alle grupper under HPFI'en i ${esc(tav.name)}`);
+    out += small('Målt om', e.type === 'group' ? `gruppens fase- og nulleder` : `alle grupper under HPFI'en i ${esc(tav.name)}${ownN ? ` (${ownN} med egen HPFI er ikke med)` : ''}`);
     if (tav.rcd !== 'none') out += small('Andel af I<sub>ΔN</sub>', `${fmt(pct, 0)} %`) + ok(pct <= 30, pct <= 30 ? 'Under 30 % af I<sub>ΔN</sub>' : 'Over 30 % af I<sub>ΔN</sub>');
     out += `<p class="m-note">Tangen omslutter både fase- og nullederne, så den måler forskellen: strømmen, der løber ud gennem PE. Lækstrømme på samme fase lægges sammen, mens lækstrømme på forskellige faser delvist ophæver hinanden.</p>`;
   } else if (m.fn === 'RE') {
@@ -339,12 +359,12 @@ function meter(id, kind) {
     const f = r.fault(P[L], P.PE, m.rf), If = M.cabs(f.I), Ub = M.cabs(f.v(P.PE, -1));
     out += big('U<sub>B</sub>', fmt(Ub, 0), 'V');
     out += small('Fejlstrøm I<sub>f</sub>', `${fmtS(If)} A`);
-    const tav = tavleOf(id);
     let tM = Infinity, tR = Infinity, pr = '';
     if (kind === 'group') { pr = protOf(e.obj); tM = M.mcbTime(pr, If / +pr.slice(1)); }
-    if (tav.rcd !== 'none' && !tav.rcdTripped) { const {p, sens} = rcdNow(id); if (If >= sens.thr) tR = If >= 5 * p.IdN ? p.t5 : p.t1; }
+    const rn = rcdNow(id);
+    if (rn.dev.rcd !== 'none' && !rn.dev.rcdTripped && If >= rn.sens.thr) tR = If >= 5 * rn.p.IdN ? rn.p.t5 : rn.p.t1;
     const trip = !isFinite(Math.min(tM, tR)) ? '<b class="m-bad">Ingen afbrydelse. Fejlen bliver stående.</b>'
-      : tM <= tR ? `${pr} efter ${app.fmtT(tM)}` : `HPFI efter ${app.fmtT(tR)}`;
+      : tM <= tR ? `${pr} efter ${app.fmtT(tM)}` : `${rn.own ? (rn.dev.rcdForm === 'rcd' ? 'Gruppens HPFI' : 'Kombiafbryderen') : 'HPFI'} efter ${app.fmtT(tR)}`;
     out += small('Afbrydelse', trip);
     const others = [];
     for (const [oid, x] of Object.entries(app.idx)) {
@@ -448,19 +468,23 @@ function inspBoard(o, kind) {
   const peWarn = pe >= 50 ? `<p class="alert">PE har ${fmt(pe, 0)} V mod jord. Udsatte dele, fx køleskabets kabinet, er livsfarlige at røre. ${more('doc-jording')}</p>` : '';
   const earthBtn = isB ? `<button type="button" class="cut-btn" data-iact="earth" data-id="${o.id}" aria-pressed="${!!o.earthBroken}">${o.earthBroken ? 'Jordledning afbrudt: klik for at genetablere' : 'Afbryd jordledningen til jordelektroden'}</button>` : '';
   set += `<label class="field">HPFI-type <select data-field="rcdType" data-id="${o.id}">${Object.entries(M.RCD_TYPES).map(([k, t]) => `<option value="${k}"${o.rcdType === k ? ' selected' : ''}>${t.name}</option>`).join('')}</select></label>`;
-  let rcdRow = `<div class="prot-row"><span>HPFI: <b>${o.rcd === 'none' ? 'ingen' : `${M.RCD_TYPES[o.rcdType].name}, ${o.rcd} mA`}</b>${o.rcd === 'none' ? '' : o.rcdTripped ? ' · <b class="txt-bad">udløst</b>' : ' · slået til'}</span>${o.rcdTripped ? btn('Slå til igen', 'rcdReset', o.id, '', 'btn-primary') : ''}</div>`;
-  if (o.rcd !== 'none' && !o.rcdTripped) {
-    const rs = app.res.residual(o.groups), IdN = o.rcd === '300' ? 0.3 : 0.03, pct = rs.ac / IdN * 100;
+  set += delayField(o);
+  const covered = M.rcdGroups(o), ownN = o.groups.length - covered.length;
+  let rcdRow = `<div class="prot-row"><span>HPFI: <b>${o.rcd === 'none' ? 'ingen' : `4P, ${M.RCD_TYPES[o.rcdType].name}, ${o.rcd} mA${o.rcdDelay ? ', korttidsforsinket' : ''}`}</b>${o.rcd === 'none' ? '' : o.rcdTripped ? ' · <b class="txt-bad">udløst</b>' : ' · slået til'}</span>${o.rcdTripped ? btn('Slå til igen', 'rcdReset', o.id, '', 'btn-primary') : ''}</div>`;
+  if (ownN) rcdRow += `<p class="hint">${ownN === o.groups.length ? 'Alle grupperne' : `${ownN} af ${o.groups.length} grupper`} har deres egen HPFI eller kombiafbryder og sidder ikke bag tavlens fælles HPFI.</p>`;
+  if (o.rcd !== 'none' && !o.rcdTripped && covered.length) {
+    const rs = app.res.residual(covered), IdN = o.rcd === '300' ? 0.3 : 0.03, pct = rs.ac / IdN * 100;
     const sens = M.rcdSens(o.rcdType, M.rcdParams(o.name, o.rcd), rs.dc);
     const big = rs.ac > IdN;
-    rcdRow += `<p class="leak-row">${big ? 'Fejlstrøm' : 'Lækstrøm'} gennem HPFI'en: <b class="num">${big ? `${fmtA(rs.ac)} A` : `${fmt(rs.ac * 1000, 1)} mA`}</b>${big ? '' : ` (${fmt(pct, 0)} % af I<sub>ΔN</sub>)`}${rs.dc ? ` · glat DC <b class="num">${fmt(rs.dc * 1000, 1)} mA</b>` : ''} ${more('doc-laek')}</p>`;
+    rcdRow += big ? `<p class="leak-row">Fejlstrøm gennem HPFI'en: <b class="num">${fmtA(rs.ac)} A</b> ${more('doc-laek')}</p>` : leakBlock(covered, o);
+    if (rs.dc) rcdRow += `<p class="leak-row">Glat DC gennem HPFI'en: <b class="num">${fmt(rs.dc * 1000, 1)} mA</b></p>`;
     if (pct > 30 && !big) rcdRow += `<p class="note">Lækstrømmen er over 30 % af I<sub>ΔN</sub>. Der er risiko for, at HPFI'en udløser, uden at der er en egentlig fejl.</p>`;
     if (sens.status !== 'ok') rcdRow += `<p class="alert">${sens.status === 'blind'
       ? `Glat DC på ${fmt(rs.dc * 1000, 0)} mA har mættet HPFI'en. Den er blind og udløser ikke ved en jordfejl.`
       : `Glat DC på ${fmt(rs.dc * 1000, 0)} mA har nedsat HPFI'ens følsomhed. Den udløser først ved ca. ${fmt(sens.thr * 1000, 0)} mA.`} ${more('doc-rcdtype')}</p>`;
   }
   const acts = btn('+ Gruppe', 'addGroup', o.id) + (isB && o.kind === 'etage' ? btn('+ Lejlighed', 'addUnit', o.id) : '') + btn(isB ? 'Slet bygning' : 'Slet lejlighed', isB ? 'delBldg' : 'delUnit', o.id, '', 'ghost danger');
-  return head(isB ? (o.kind === 'hus' ? 'Hus · hovedtavle' : 'Etageejendom · hovedtavle') : 'Lejlighed · undertavle', o.name) +
+  return head(isB ? `${{hus: 'Hus', etage: 'Etageejendom', hal: 'Erhverv'}[o.kind]} · hovedtavle` : 'Lejlighed · undertavle', o.name) +
     intro(isB ? (app.isLocal(o) ? INTRO.local : INTRO[app.earthingOf(o)]) : INTRO.unit + (app.isLocal(app.find(o.id).bldg) ? ' ' + INTRO.nullet : ''), isB ? 'doc-jording' : 'doc-stige') +
     sec('', nButton(o, isB) + earthBtn + rcdRow + peWarn) +
     sec('Nulpunkt og belastning', phasor(o.id, loadCtl(o))) +
@@ -549,8 +573,8 @@ function inspGroup(g) {
   const e = app.find(g.id), owner = e.owner, sup = app.supplyOf(owner), gph = g.phases.filter(p => sup.includes(p));
   const cats = {};
   M.APPL.filter(a => M.connOptions(a, gph).length).forEach(a => { (cats[a.cat] = cats[a.cat] || []).push(a); });
-  const opts = Object.entries(cats).map(([c, list]) => `<optgroup label="${esc(c)}">${list.map(a => `<option value="${a.id}">${esc(a.name)} (${fmtS(M.defTotal(a))} W)</option>`).join('')}</optgroup>`).join('');
-  const apps = g.apps.map(a => { const i = app.appInfo(a); return `<li><button type="button" class="link st-${i.st}" data-isel="app:${a.id}">${esc(M.APPL_BY_ID[a.type].name)}</button> <span class="muted">${M.connLabel(app.connOf(a))}</span> <span class="muted num">${i.st === 'burned' ? 'brændt' : i.st === 'slukket' ? 'slukket' : `${fmt(i.v, 0)} V`}</span></li>`; }).join('');
+  const opts = Object.entries(cats).map(([c, list]) => `<optgroup label="${esc(c)}">${list.map(a => `<option value="${a.id}"${a.id === addMem.type ? ' selected' : ''}>${esc(a.name)} (${fmtS(M.defTotal(a))} W${a.lum ? `, ${fmt(a.leak, 2)} mA` : ''})</option>`).join('')}</optgroup>`).join('');
+  const apps = g.apps.map(a => { const i = app.appInfo(a), n = M.appQty(a); return `<li><button type="button" class="link st-${i.st}" data-isel="app:${a.id}">${n > 1 ? `${n} × ` : ''}${esc(M.APPL_BY_ID[a.type].name)}</button> <span class="muted">${M.connLabel(app.connOf(a))}</span> <span class="muted num">${i.st === 'burned' ? 'brændt' : i.st === 'slukket' ? 'slukket' : `${fmt(i.v, 0)} V`}</span></li>`; }).join('');
   const pr = protOf(g), load = groupLoad(g), G = app.res.ckt.boards[g.id], Lg = ['L1', 'L2', 'L3'].find(k => G[k] !== undefined);
   const pts = [];
   if (load > 0.05) pts.push({I: load, label: `Belastning ${fmtS(load)} A`, color: 'var(--good)'});
@@ -562,7 +586,6 @@ function inspGroup(g) {
   }
   const protSec = sec('Gruppeafbryder', `<div class="prot-row"><span><b>${pr}</b> · ${g.tripped ? '<b class="txt-bad">udløst</b>' : owner.rcdTripped ? 'HPFI i tavlen er udløst' : 'slået til'}</span>${g.tripped ? btn('Slå til igen', 'untrip', g.id, '', 'btn-primary') : btn('Slå fra', 'trip', g.id)}</div>
     <div class="prot-row"><span>AFDD (lysbuedetektor): <b>${g.afdd ? 'monteret' : 'ingen'}</b></span>${btn(g.afdd ? 'Fjern AFDD' : 'Monter AFDD', 'afdd', g.id)}</div>
-    <p class="leak-row">Lækstrøm i gruppen: <b class="num">${fmt(app.res.residual([g]).ac * 1000, 2)} mA</b> ${more('doc-laek')}</p>
     ${U.tcSVG(pr, pts)}<p class="hint">Forenklet ${pr[0]}-karakteristik: termisk udløsning over 1,13 · I<sub>n</sub>, momentan udløsning ved ${pr[0] === 'B' ? 5 : 10} · I<sub>n</sub>. Fejlstrømmen er beregnet for en jordfejl ved gruppens ende. ${more('doc-beskyttelse')}</p>`);
   const fp = g.fault ? g.fault.pair : '', fr = g.fault ? g.fault.R : 3e5, isArc = fp.startsWith('ARC');
   let arcTxt = '';
@@ -572,15 +595,46 @@ function inspGroup(g) {
       <label class="field">Fejl <select data-field="faultPair" data-id="${g.id}">${[['', 'Ingen'], ['L-PE', 'Isolationsfejl fase–PE'], ['N-PE', 'Isolationsfejl nul–PE'], ['L-N', 'Isolationsfejl fase–nul'], ['ARC-S', 'Løs forbindelse (serielysbue)'], ['ARC-P', 'Lysbue fase–nul']].map(([v, t]) => `<option value="${v}"${v === fp ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
       <label class="field">Fejlmodstand <select data-field="faultR" data-id="${g.id}"${g.fault && !isArc ? '' : ' disabled'}>${[[0.1, '0,1 Ω'], [10, '10 Ω'], [1e3, '1 kΩ'], [1e4, '10 kΩ'], [1.5e4, '15 kΩ'], [2e4, '20 kΩ'], [3e4, '30 kΩ'], [1e5, '100 kΩ'], [3e5, '300 kΩ'], [8e5, '800 kΩ']].map(([v, t]) => `<option value="${v}"${v === fr ? ' selected' : ''}>${t}</option>`).join('')}</select></label></div>
     ${arcTxt}<p class="hint">En isolationsfejl med høj modstand mærkes kun ved R ISO-måling. Med lav modstand får den afbryder eller HPFI til at udløse. En lysbue kan kun opdages af en AFDD. ${more('doc-iso')}</p>`);
-  return head('Gruppe', `${g.name} · ${owner.name}`) + intro(INTRO.grp, 'doc-beskyttelse') + protSec + ikSection(g.id, 'group') +
-    sec('Tilføj brugsgenstand', `<div class="add-app"><select id="addAppSel" aria-label="Vælg brugsgenstand">${opts}</select>${btn('Tilføj', 'addApp', g.id, '', 'btn-primary')}</div>`) +
-    (apps ? sec('Brugsgenstande', `<ul class="app-list">${apps}</ul>`) : '') +
+  return head('Gruppe', `${g.name} · ${owner.name}`) + intro(INTRO.grp, 'doc-beskyttelse') + protSec + rcdSection(g, owner) + ikSection(g.id, 'group') +
+    sec('Tilføj brugsgenstand', addRow(g, gph, opts)) +
+    (apps ? sec('Brugsgenstande', `<ul class="app-list">${apps}</ul><div class="btns">${btn(g.apps.some(a => a.on) ? 'Sluk alle' : 'Tænd alle på én gang', 'gAppsOnOff', g.id)}</div>`) : '') +
     meter(g.id, 'group') + faultSec +
     sec('Indstillinger', `<div class="fields"><label class="field">Navn <input type="text" data-field="name" data-id="${g.id}" value="${esc(g.name)}"></label>
       <div class="field"><span>Faser i gruppen</span><span class="seg">${sup.map(p => `<button type="button" data-iact="gphase" data-id="${g.id}" data-c="${p}" aria-pressed="${g.phases.includes(p)}">${p}</button>`).join('')}</span></div>
       <label class="field">Gruppeafbryder <select data-field="prot" data-id="${g.id}">${PROTS.map(p => `<option${p === protOf(g) ? ' selected' : ''}>${p}</option>`).join('')}</select></label>
       ${cableFields(g.id, 'Gruppeledning')}</div>`) +
     sec('', `<div class="btns">${btn('Vis gruppeledning', 'selCable', g.id)}${btn('Slet gruppe', 'delGroup', g.id, '', 'ghost danger')}</div>`);
+}
+// Gruppens egen fejlstrømsbeskyttelse: ingen (tavlens fælles HPFI), kombiafbryder eller HPFI og gruppeafbryder
+function delayField(o) {
+  return `<label class="field">Udløsning <select data-field="rcdDelay" data-id="${o.id}"><option value="0"${o.rcdDelay ? '' : ' selected'}>Almindelig (momentan)</option><option value="1"${o.rcdDelay ? ' selected' : ''}>Korttidsforsinket (G/KV)</option></select></label>`;
+}
+function rcdSection(g, owner) {
+  const own = M.ownRcd(g), v = own ? (g.rcdForm === 'rcd' ? 'rcd' : 'rcbo') : 'none';
+  let h = `<div class="fields"><label class="field">Fejlstrømsafbryder <select data-field="grcd" data-id="${g.id}">${[['none', 'Ingen egen (tavlens fælles HPFI)'], ['rcbo', 'Kombiafbryder (RCBO) 30 mA'], ['rcd', 'HPFI 30 mA og gruppeafbryder']].map(([k, t]) => `<option value="${k}"${k === v ? ' selected' : ''}>${t}</option>`).join('')}</select></label>`;
+  if (own) h += `<label class="field">Type <select data-field="rcdType" data-id="${g.id}">${Object.entries(M.RCD_TYPES).map(([k, t]) => `<option value="${k}"${g.rcdType === k ? ' selected' : ''}>${t.name}</option>`).join('')}</select></label>${delayField(g)}`;
+  h += '</div>';
+  if (own) {
+    h += `<div class="prot-row"><span><b>${esc(app.rcdName(g))}</b>, ${M.RCD_TYPES[g.rcdType].name}, 30 mA${g.rcdDelay ? ', korttidsforsinket' : ''} · ${g.rcdTripped ? '<b class="txt-bad">udløst</b>' : 'slået til'}</span>${g.rcdTripped ? btn('Slå til igen', 'rcdReset', g.id, '', 'btn-primary') : ''}</div>`;
+    if (!g.rcdTripped && !g.tripped) {
+      const rs = app.res.residual([g]);
+      h += rs.ac > 0.03 ? `<p class="leak-row">Fejlstrøm gennem afbryderen: <b class="num">${fmtA(rs.ac)} A</b></p>` : leakBlock([g], g);
+    }
+    h += `<p class="hint">Gruppen sidder ikke bag tavlens fælles HPFI. Kun gruppens egne lækstrømme tæller, og en udløsning slukker kun denne gruppe. ${more('doc-laek')}</p>`;
+  } else {
+    h += `<p class="leak-row">Lækstrøm i gruppen: <b class="num">${fmt(app.res.residual([g]).ac * 1000, 2)} mA</b>. Gruppen er beskyttet af ${owner.rcd === 'none' ? '<b>ingen HPFI</b>' : `tavlens fælles HPFI i ${esc(owner.name)}, som også ser de andre gruppers lækstrøm`}. ${more('doc-laek')}</p>`;
+  }
+  return sec('Fejlstrømsbeskyttelse', h);
+}
+// Det sidst valgte i "Tilføj brugsgenstand" huskes, så man kan tilføje det samme flere gange
+const addMem = {type: '', n: 1, ph: ''};
+function addRow(g, gph, opts) {
+  const multi = gph.length > 1;
+  return `<div class="add-app"><select id="addAppSel" aria-label="Vælg brugsgenstand">${opts}</select>
+    <label class="add-n">Antal <input type="number" id="addAppN" min="1" max="200" step="1" value="${addMem.n}"></label>
+    ${multi ? `<select id="addAppPh" aria-label="Fase">${gph.map(p => `<option value="${p}"${addMem.ph === p ? ' selected' : ''}>${p}</option>`).join('')}<option value="all"${addMem.ph === 'all' ? ' selected' : ''}>Fordelt på faserne</option></select>` : ''}
+    ${btn('Tilføj', 'addApp', g.id, '', 'btn-primary')}</div>
+    <p class="hint">Armaturer tilføjes som én linje med antal${multi ? ' pr. fase' : ''}. Lækstrømmen pr. stk. kan rettes til databladets værdi i armaturets panel.</p>`;
 }
 const ST_LABEL = {ok: 'I orden', tol: 'Uden for tolerance', low: 'Underspænding', burn: 'Over tålegrænsen', burned: 'Brændt af', off: 'Ingen spænding', slukket: 'Slukket', dcstop: 'Stoppet af DC-overvågning'};
 function stText(st, info, a) {
@@ -607,25 +661,28 @@ function inspApp(a) {
       return {k: p.k, lbl: p.e.lbl, v: M.rms(vs), i: M.rms(is), thd: M.thd(is), st: p.st, is, vs};
     });
     const tr = rows.map(x => row(`${x.lbl}: U / I`, `${fmt(x.v, 1)} V / ${fmtA(x.i)} A`, x.st === 'ok' ? '' : x.st)).join('');
-    meas = sec('Målt', table([tr, row('Effekt nu', `${fmtS(P)} W <span class="muted">(${fmt(P / a.P * 100, 0)} % af mærkeeffekten)</span>`), row('THD i strømmen', `${fmt(rows[0].thd * 100, 0)} %`)]));
+    meas = sec('Målt', table([tr, row('Effekt nu', `${fmtS(P)} W <span class="muted">(${fmt(P / M.appPtot(a) * 100, 0)} % af mærkeeffekten)</span>`), row('THD i strømmen', `${fmt(rows[0].thd * 100, 0)} %`)]));
     const x = rows[0];
     meas += sec('', U.scopeSVG([{label: 'u', color: 'var(--muted)', s: x.vs, w: 1.5}], 'V', rows.length > 1 ? `Spænding over elementet ${x.lbl}` : `Spænding over apparatet (${x.lbl})`));
     meas += sec('', U.scopeSVG([{label: 'i', color: 'var(--combo)', s: x.is}], 'A', 'Strøm i apparatet'));
     if (Object.keys(M.HP[d.harm].h).length) meas += sec('', U.spectrumSVG(x.is, 'A', 'var(--combo)', 'Harmoniske strømme'));
   }
+  const n = M.appQty(a), lk = M.appLeak(a);
   const facts = table([
-    row('Mærkeeffekt', `<input type="number" min="1" max="22000" step="1" data-field="appP" data-id="${a.id}" value="${Math.round(a.P)}"> W`),
+    row('Mærkeeffekt', `<input type="number" min="1" max="22000" step="1" data-field="appP" data-id="${a.id}" value="${Math.round(a.P)}"> W${d.lum ? ' pr. stk.' : ''}`),
+    ...(d.lum ? [row('Antal', `<input type="number" min="1" max="500" step="1" data-field="appQty" data-id="${a.id}" value="${n}"> stk.`)] : []),
     row('Tilslutning', connOpts.length ? `<select data-field="conn" data-id="${a.id}">${connOpts.map(c => `<option value="${c}"${c === curConn ? ' selected' : ''}>${M.connLabel(c)}</option>`).join('')}</select>` : 'kan ikke tilsluttes med gruppens faser'),
     row('cos φ', fmt(d.cos, 2)),
     row('Harmoniske', esc(M.HP[d.harm].name)),
     row('Tålegrænse', `${d.vMax} V${d.vMin ? ` · underspænding under ${d.vMin} V` : ''}`),
-    row('Lækstrøm til PE', d.leak ? `${fmt(d.leak, 1)} mA (${d.leakRes ? 'resistiv' : 'kapacitiv'})` : 'ingen (klasse II)'),
+    row('Lækstrøm til PE', `<input type="number" min="0" max="50" step="0.05" data-field="appLeak" data-id="${a.id}" value="${+lk.toFixed(3)}"> mA${d.lum ? ' pr. stk.' : ''} <span class="muted">${lk ? (d.leakRes ? 'resistiv' : 'kapacitiv') : 'klasse II'}${n > 1 ? `, i alt ${fmt(lk * n, 2)} mA` : ''}</span>`),
+    ...(d.surge ? [row('Indkoblingsspids', `ca. ${fmt(d.surge, 1)} mA pr. stk. <span class="muted">(forenklet)</span>`)] : []),
   ]);
   const dcSec = d.dcCap ? sec('DC-fejlstrøm', `<div class="fields">
       <label class="field">Glat DC-fejlstrøm <select data-field="appDC" data-id="${a.id}">${[0, 3, 6, 10, 20, 50].map(v => `<option value="${v}"${v === (a.dc || 0) ? ' selected' : ''}>${v} mA</option>`).join('')}</select></label>
       ${a.type === 'elbil' ? `<label class="field">6 mA DC-overvågning (RDC-DD) <select data-field="rdcdd" data-id="${a.id}"><option value="1"${a.rdcdd ? ' selected' : ''}>Til</option><option value="0"${a.rdcdd ? '' : ' selected'}>Fra</option></select></label>` : ''}</div>
     <p class="hint">En fejl i apparatets elektronik kan sende glat DC ud i PE. Det kan mætte en HPFI af type AC, A eller F, så den bliver blind. ${more('doc-rcdtype')}</p>`) : '';
-  return head(`Brugsgenstand · ${esc(d.cat)}`, d.name) +
+  return head(`Brugsgenstand · ${esc(d.cat)}`, `${n > 1 ? `${n} × ` : ''}${d.name}`) +
     sec('', `<p class="where">${esc(app.where(a.id))}</p><div class="status st-${info.st}"><b>${ST_LABEL[info.st]}</b>${info.st !== 'slukket' && info.st !== 'burned' && info.st !== 'off' ? ` <span class="num">${fmt(info.v, 0)} V</span>` : ''}<p>${stText(info.st, info, a)}</p></div><p class="hint">${esc(d.info)} ${more(['smps', 'led', 'mikro', 'induk', 'vfd'].includes(d.harm) ? 'doc-harm' : 'doc-nul')}</p>`) +
     sec('', `<div class="btns">${a.burned ? btn('Reparer', 'repair', a.id, '', 'btn-primary') : ''}${a.dcTripped ? btn('Nulstil laderen', 'dcReset', a.id, '', 'btn-primary') : ''}${btn(a.on ? 'Sluk' : 'Tænd', 'toggleOn', a.id)}${btn('Vis gruppe', 'selGroup', e.group.id)}${btn('Slet', 'delApp', a.id, '', 'ghost danger')}</div>`) +
     dcSec + meas + sec('Data', facts);
@@ -655,13 +712,15 @@ const IACT = {
   delUnit: id => { const e = app.find(id); e.bldg.units = e.bldg.units.filter(u => u.id !== id); app.sel = null; },
   delGroup: id => { const e = app.find(id); e.owner.groups = e.owner.groups.filter(g => g.id !== id); app.sel = null; },
   delApp: id => { const e = app.find(id); e.group.apps = e.group.apps.filter(a => a.id !== id); app.sel = {type: 'group', id: e.group.id}; },
-  toggleOn: id => { const a = app.find(id).obj; a.on = !a.on; },
-  appsOnOff: id => { const o = app.find(id).obj, apps = o.groups.flatMap(g => g.apps), on = !apps.some(a => a.on); apps.forEach(a => { a.on = on; }); },
+  // At tænde armaturer giver en indkoblingsspids (app.surge), som HPFI'en kan reagere på
+  toggleOn: id => { const a = app.find(id).obj; a.on = !a.on; if (a.on) app.surge = [a.id]; },
+  appsOnOff: id => { const o = app.find(id).obj, apps = o.groups.flatMap(g => g.apps), on = !apps.some(a => a.on); apps.forEach(a => { a.on = on; }); if (on) app.energize(o.groups); },
+  gAppsOnOff: id => { const g = app.find(id).obj, on = !g.apps.some(a => a.on); g.apps.forEach(a => { a.on = on; }); if (on) app.energize([g]); },
   bankReset: id => { app.find(id).obj.bank = null; },
   repair: id => { app.find(id).obj.burned = false; app.eventLog = app.eventLog.filter(x => x.id !== id); },
-  untrip: id => { app.find(id).obj.tripped = false; app.eventLog = app.eventLog.filter(x => x.id !== id); },
+  untrip: id => { const g = app.find(id).obj; g.tripped = false; app.eventLog = app.eventLog.filter(x => x.id !== id); app.energize([g]); },
   trip: id => { app.find(id).obj.tripped = true; },
-  rcdReset: id => { app.find(id).obj.rcdTripped = false; app.eventLog = app.eventLog.filter(x => x.id !== id); },
+  rcdReset: id => { const e = app.find(id); e.obj.rcdTripped = false; app.eventLog = app.eventLog.filter(x => x.id !== id); app.energize(e.type === 'group' ? [e.obj] : M.rcdGroups(e.obj)); },
   earth: id => { const b = app.find(id).obj; b.earthBroken = !b.earthBroken; },
   faultInsert: id => { app.find(id).obj.fault = {pair: 'L-PE', R: app.meter.rf}; },
   afdd: id => { const g = app.find(id).obj; g.afdd = !g.afdd; },
@@ -672,7 +731,18 @@ const IACT = {
   gphase: (id, c) => togglePhase(app.find(id).obj, c),
   dcReset: id => { app.find(id).obj.dcTripped = false; app.eventLog = app.eventLog.filter(x => x.id !== id); },
   cut: (id, c) => { const o = app.find(id).obj; o.cable.broken[c] = !o.cable.broken[c]; },
-  addApp: id => { const g = app.find(id).obj, a = M.app($('#addAppSel').value); g.apps.push(a); },
+  // Armaturer bliver én linje pr. fase med antallet fordelt ligeligt. Andre brugsgenstande tilføjes hver for sig.
+  addApp: id => {
+    const g = app.find(id).obj, type = $('#addAppSel').value, def = M.APPL_BY_ID[type], phSel = $('#addAppPh');
+    const n = Math.max(1, Math.min(200, Math.round(+$('#addAppN').value) || 1)), ph = phSel ? phSel.value : '';
+    Object.assign(addMem, {type, n, ph});
+    const list = def.kind !== 'LN' || !ph ? [null] : ph === 'all' ? [...phSel.options].map(o => o.value).filter(v => v !== 'all') : [ph];
+    const added = [];
+    if (def.lum) list.forEach((p, i) => { const q = Math.floor(n / list.length) + (i < n % list.length ? 1 : 0); if (q) added.push(Object.assign(M.app(type, q), p ? {conn: p} : {})); });
+    else for (let i = 0; i < n; i++) { const p = list[i % list.length]; added.push(Object.assign(M.app(type), p ? {conn: p} : {})); }
+    g.apps.push(...added);
+    app.surge = added.map(a => a.id);
+  },
   addGroup: id => app.act('addGroup', id),
   addUnit: id => app.act('addUnit', id),
   addHus: id => app.act('addHus', id),
@@ -699,6 +769,10 @@ const FIELDS = {
   appP: (o, v) => { const x = parseFloat(v); if (x > 0) o.P = x; },
   rcd: (o, v) => { o.rcd = v; o.rcdTripped = false; },
   rcdType: (o, v) => { o.rcdType = v; o.rcdTripped = false; },
+  rcdDelay: (o, v) => { o.rcdDelay = v === '1'; },
+  grcd: (o, v) => { if (v === 'none') o.rcd = 'none'; else { o.rcd = '30'; o.rcdForm = v; } o.rcdTripped = false; },
+  appQty: (o, v) => { const x = Math.round(parseFloat(v)); if (x >= 1) o.qty = Math.min(500, x); },
+  appLeak: (o, v) => { const x = parseFloat(v); if (x >= 0) o.leak = Math.min(50, x); },
   appDC: (o, v) => { o.dc = +v; o.dcTripped = false; },
   rdcdd: (o, v) => { o.rdcdd = v === '1'; o.dcTripped = false; },
   faultPair: (o, v) => { o.fault = v ? {pair: v, R: o.fault ? o.fault.R : 3e5} : null; },

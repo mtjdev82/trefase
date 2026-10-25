@@ -297,7 +297,15 @@ const SECTIONS = [
     <h3>Eksempel: LED-armaturer på en 30 mA HPFI</h3>
     <p>Et LED-armatur i klasse I lækker typisk 0,3–1 mA. Med 0,5 mA pr. armatur, alle på samme fase, når lækstrømmen 9 mA (30 %) ved 18 armaturer, og fra 30 armaturer (15 mA) kan HPFI'en udløse. Fordeles de samme armaturer ligeligt på tre faser, ophæver 50 Hz-delen sig næsten. Indkoblingsstrømmen gør det alligevel klogt at holde sig til fabrikantens højeste antal pr. HPFI.</p>
     <h3>I simulatoren</h3>
-    <p>Lækstrømmen måles med en lækstrømstang omkring alle strømførende ledere. Tangen måler forskellen, altså det, der løber ud gennem PE. I simulatoren er det målefunktionen <b>Lækstrøm</b>, og tavlens panel viser lækstrømmen gennem HPFI'en i mA og i procent af I<sub>ΔN</sub>. Simulatoren regner med 50 Hz-delen af lækstrømmene. Indkoblingsspidser og højfrekvente strømme er ikke med.</p>`],
+    <p>Lækstrømmen måles med en lækstrømstang omkring alle strømførende ledere. Tangen måler forskellen, altså det, der løber ud gennem PE. I simulatoren er det målefunktionen <b>Lækstrøm</b>.</p>
+    <ul>
+      <li><b>Forsøget:</b> vælg eksemplet "Værkstedshal med LED-armaturer". Lys 1, 2 og 3 sidder bag tavlens fælles 4P HPFI, mens Lys hal (3f+N) og Kontor har hver sin kombiafbryder. Opgaverne under diagrammet guider dig igennem.</li>
+      <li><b>Armaturer:</b> under "Tilføj brugsgenstand" findes LED-armatur, LED-downlight, lysstofarmatur med HF-forkobling og LED high-bay med typiske lækstrømme. Vælg antal og fase, eller "Fordelt på faserne". I armaturets panel kan antallet og lækstrømmen pr. stk. rettes til databladets værdi.</li>
+      <li><b>Måleren:</b> tavlens og gruppens panel viser lækstrømmen gennem HPFI'en på en skala med zonerne 30 %, 50 % og 100 % af I<sub>ΔN</sub>, og et viserdiagram med lækstrømmen fra hver fase og summen.</li>
+      <li><b>Egen HPFI i gruppen:</b> under "Fejlstrømsbeskyttelse" i gruppens panel kan gruppen få en kombiafbryder (RCBO) eller en HPFI og gruppeafbryder. Antallet af poler følger gruppens faser, fx 4P til 3f+N. Gruppen sidder så ikke længere bag tavlens fælles HPFI.</li>
+      <li><b>Indkoblingsspids:</b> når armaturer tændes (Tænd, Tilføj eller Slå til igen), regner simulatoren med en kort spids på 0,3–1 mA pr. armatur oven i lækstrømmen. Spidserne lægges sammen uden ophævning mellem faserne. Det er forenklede undervisningsværdier. En korttidsforsinket HPFI (G/KV) reagerer ikke på spidsen.</li>
+    </ul>
+    <p>Simulatoren regner ellers kun med 50 Hz-delen af lækstrømmene. Højfrekvente strømme er ikke med.</p>`],
 
   ['doc-harm', 'Harmoniske strømme', `
     <p>Ikke-lineære apparater som SMPS-strømforsyninger, LED-drivere og frekvensomformere trækker ikke en sinusformet strøm. En SMPS uden PFC lader sin kondensator op i korte pulser nær spændingens top. Pulserne kan skrives som en sum af sinuskurver med 50 Hz (grundtonen) og hele multipla: 150 Hz (3.), 250 Hz (5.), 350 Hz (7.) osv.</p>
@@ -320,7 +328,7 @@ const SECTIONS = [
       <li>Udløsetiden må højst være 300 ms ved 1 · I<sub>ΔN</sub> og 40 ms ved 5 · I<sub>ΔN</sub>.</li>
       <li>Den beskytter ikke mod overbelastning, kortslutning mellem fase og nul eller manglende nul.</li>
     </ul>
-    <p>I simulatoren sidder der én HPFI i hver tavle, som beskytter tavlens grupper. Hver HPFI har sin egen faste udløsestrøm og -tid inden for grænserne. Typen (AC, A, F eller B) vælges i tavlens indstillinger. Se også <button type="button" class="link" data-doc="doc-rcdtype">HPFI-typer og glat DC</button>, <button type="button" class="link" data-doc="doc-laek">Lækstrømme</button> og <button type="button" class="link" data-doc="doc-afdd">AFDD</button>.</p>`],
+    <p>I simulatoren har hver tavle en fælles 4-polet HPFI for de grupper, der ikke har deres egen. En gruppe kan få sin egen kombiafbryder (RCBO) eller HPFI og gruppeafbryder under "Fejlstrømsbeskyttelse" i gruppens panel, fx en 4P kombiafbryder til en gruppe med 3f+N. Hver HPFI har sin egen faste udløsestrøm og -tid inden for grænserne. Typen (AC, A, F eller B) og korttidsforsinkelse vælges i tavlens eller gruppens indstillinger. Se også <button type="button" class="link" data-doc="doc-rcdtype">HPFI-typer og glat DC</button>, <button type="button" class="link" data-doc="doc-laek">Lækstrømme</button> og <button type="button" class="link" data-doc="doc-afdd">AFDD</button>.</p>`],
 
   ['doc-ik', 'Kortslutningsstrøm: Ik,max og Ik,min', `
     <p>Kortslutningsstrømmen Ik er den strøm, der løber, hvis to ledere kortsluttes i et punkt. Den bestemmes af spændingen og af impedansen fra transformeren hen til fejlstedet: transformerens kortslutningsimpedans og alle kablerne på vejen. Jo lavere impedans, jo større Ik, og jo stivere er nettet i det punkt.</p>
@@ -417,7 +425,8 @@ const SECTIONS = [
       <li><b>Ikke-lineære apparater</b> sender desuden harmoniske strømme ud med et typisk spektrum. Hver harmonisk orden regnes for sig (150 Hz, 250 Hz …), og kablernes reaktans skaleres med frekvensen.</li>
       <li><b>Hændelser</b>: efter hver beregning findes det, der sker først. Det kan være en gruppeafbryder (momentant 10 ms eller termisk), en HPFI (typisk 10–30 ms) eller det værst ramte apparat, der brænder af efter ca. 0,5 s. Hændelsen udføres, og nettet regnes igen, indtil der ikke sker mere.</li>
       <li><b>Isolation</b>: hver gruppe har sund isolation, og en isolationsfejl indgår både i R ISO-målingen og i selve nettet.</li>
-      <li><b>Lækstrøm</b>: hvert klasse I-apparat har en modstand (varmelegemer) eller en kapacitet (EMC-filter) fra fasen til PE, som giver dets typiske lækstrøm ved 230 V. Kapaciteten leder mere ved højere frekvenser.</li>
+      <li><b>Lækstrøm</b>: hvert klasse I-apparat har en modstand (varmelegemer) eller en kapacitet (EMC-filter) fra fasen til PE, som giver dets typiske lækstrøm ved 230 V. Kapaciteten leder mere ved højere frekvenser. Armaturer har et antal, og lækstrømmen pr. stk. kan rettes.</li>
+      <li><b>Indkoblingsspids</b>: i den beregning, der følger lige efter, at armaturer tændes, lægges en spids på 0,3–1 mA pr. armatur oven i lækstrømmen for hver HPFI, der ikke er korttidsforsinket. Udløser den, sker det efter 10 ms.</li>
       <li><b>Glat DC</b> indgår ikke i vekselstrømsberegningen, men lægges sammen for hver HPFI og bruges til at afgøre, om den er mættet. DC kan kun løbe, hvis apparatets PE er forbundet.</li>
       <li><b>Lysbuer</b> er modstande: en løs forbindelse i fasen eller en lysbue mellem fase og nul. AFDD-tiderne følger IEC 62606.</li>
     </ul>
@@ -427,7 +436,8 @@ const SECTIONS = [
       <li>Apparater regulerer ikke deres effekt. En SMPS trækker i virkeligheden mere strøm, når spændingen falder.</li>
       <li>Der er ingen gensidig induktans mellem lederne, ingen opvarmning af kabler og ingen dynamik. Termiske udløsetider regnes ud fra den stationære strøm.</li>
       <li>Fordelingsnettet har kun driftsjord ved transformeren. Der er ingen jordelektroder i kabelskabene og ingen forbindelse via vandrør eller andre bygninger.</li>
-      <li>Én HPFI pr. tavle og én isolationsfejl pr. gruppe.</li>
+      <li>Én fælles HPFI pr. tavle plus eventuelt én i hver gruppe, og én isolationsfejl pr. gruppe.</li>
+      <li>Indkoblingsspidsen er et forenklet tal pr. armatur. I virkeligheden afhænger den af driveren, af hvornår i perioden der tændes, og af om polerne lukker samtidig.</li>
     </ul>
     <h3>Kabeldata</h3>${cableTable()}
     <h3>Brugsgenstande</h3>${applTable()}
@@ -467,6 +477,9 @@ const SECTIONS = [
       <dt>R ISO</dt><dd>Isolationsmodstand, målt med jævnspænding.</dd>
       <dt>R LOW</dt><dd>Lavohmsmåling af kontinuiteten i beskyttelseslederne.</dd>
       <dt>HPFI</dt><dd>Fejlstrømsafbryder (RCD), der udløser ved forskel mellem udgående og returnerende strøm.</dd>
+      <dt>Kombiafbryder (RCBO)</dt><dd>Gruppeafbryder og HPFI i ét. Findes 2-polet (1f+N) og 4-polet (3f+N).</dd>
+      <dt>Korttidsforsinket HPFI</dt><dd>HPFI, der tåler korte strømspidser, fx når mange armaturer tændes, men stadig udløser ved en fejlstrøm, der varer ved. Ofte mærket G eller KV.</dd>
+      <dt>Indkoblingsspids</dt><dd>Kort strøm til PE, når EMC-filtrenes kondensatorer lades op ved tænding.</dd>
       <dt>SMPS</dt><dd>Switch mode-strømforsyning, fx en oplader. Trækker strøm i pulser og giver harmoniske.</dd>
       <dt>PFC</dt><dd>Power factor correction. Gør en SMPS' strøm næsten sinusformet.</dd>
       <dt>THD</dt><dd>Total harmonisk forvrængning: de harmoniskes samlede størrelse i forhold til grundtonen.</dd>

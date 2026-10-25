@@ -192,8 +192,17 @@
 .fields .field input[type="number"]{width:6em;text-align:right}
 .btns{display:flex;flex-wrap:wrap;gap:6px}
 .ghost.danger{color:var(--bad)}
-.add-app{display:flex;gap:6px}
-.add-app select{flex:1;min-width:0}
+.add-app{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.add-app #addAppSel{flex:1 1 100%;min-width:0}
+.add-n{display:inline-flex;align-items:center;gap:6px;font-size:.88em;color:var(--muted)}
+.add-n input{width:4.2em;text-align:right}
+/* Lækstrøm gennem en HPFI: måler med zoner og viserne fra faserne */
+.leak-box{display:grid;gap:6px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel-2)}
+.gauge{width:100%;max-width:420px;display:block}
+.leak-fig{margin:0;display:grid;gap:4px;justify-items:center}
+.leak-svg{width:100%;max-width:300px;display:block}
+.leak-fig figcaption{font-size:.82em;color:var(--muted);justify-self:stretch}
+.zone{color:var(--sc)}
 .app-list{list-style:none;margin:0;padding:0;display:grid;gap:3px;font-size:.9em}
 .app-list .link{color:var(--sc, var(--ink))}
 

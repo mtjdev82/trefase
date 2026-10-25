@@ -13,6 +13,8 @@ const app = window.InstApp = {
   idx: {},
   eventLog: [],
   meter: {fn: 'U', phase: 'L1', ll: false, rf: 0.01},
+  // Armaturer, der lige er tændt. Deres indkoblingsspids indgår kun i den næste beregning.
+  surge: null,
 };
 
 /* ---------- Opslag ---------- */
@@ -75,6 +77,21 @@ app.where = id => {
   return e.obj.name;
 };
 
+// Gruppens egen fejlstrømsafbryder, fx "4P kombiafbryder (3f+N)"
+app.rcdName = g => {
+  const n = g.phases.length, poles = `${n + 1}P`, f = `${n}f+N`;
+  return g.rcdForm === 'rcd' ? `${poles} HPFI og gruppeafbryder (${f})` : `${poles} kombiafbryder (RCBO, ${f})`;
+};
+// Den HPFI, der beskytter et punkt: gruppens egen, ellers tavlens fælles. groups er dem, den ser.
+app.rcdOf = id => {
+  const e = app.idx[id];
+  if (e.type === 'group' && M.ownRcd(e.obj)) return {dev: e.obj, board: e.owner, groups: [e.obj], key: `${e.owner.name} · ${e.obj.name}`, own: true};
+  const o = e.type === 'group' ? e.owner : e.obj;
+  return {dev: o, board: o, groups: M.rcdGroups(o), key: o.name, own: false};
+};
+// Tændte armaturer i grupperne, som giver en indkoblingsspids, når de får spænding
+app.energize = groups => { app.surge = groups.flatMap(g => g.apps.filter(a => a.on && !a.burned).map(a => a.id)); };
+
 /* ---------- Status for spændinger ---------- */
 const RANK = {ok: 0, tol: 1, low: 2, burn: 3};
 app.vStatus = (v, def) => {
@@ -118,14 +135,17 @@ app.eventText = e => {
   if (e.type === 'mcb') return {type: 'mcb', id: e.g.id, I: e.I, sel: `group:${e.g.id}`, name: `${e.prot} i ${e.owner.name} · ${e.g.name}`, text: `udløste (${U.fmtS(e.I)} A)`};
   if (e.type === 'afdd') return {type: 'afdd', id: e.g.id, sel: `group:${e.g.id}`, name: `AFDD i ${e.owner.name} · ${e.g.name}`, text: `udløste (${e.kind === 'ARC-S' ? 'serielysbue' : 'parallel lysbue'}, ${U.fmtS(e.I)} A)`};
   if (e.type === 'rdcdd') return {type: 'rdcdd', id: e.app.id, sel: `app:${e.app.id}`, name: `${M.APPL_BY_ID[e.app.type].name} i ${e.owner.name}`, text: `stoppede på DC-overvågningen (${fmt(e.I * 1000, 0)} mA glat DC)`};
-  return {type: 'rcd', id: e.owner.id, sel: `${app.idx[e.owner.id].type}:${e.owner.id}`, name: `HPFI i ${e.owner.name}`, text: `udløste (${e.dc ? 'glat DC' : 'fejlstrøm'} ${fmt(e.I * 1000, 0)} mA)`};
+  const what = e.surge ? `ved tænding: lækstrøm og indkoblingsspids ca. ${fmt(e.I * 1000, 0)} mA` : `${e.dc ? 'glat DC' : 'fejlstrøm'} ${fmt(e.I * 1000, 0)} mA`;
+  if (e.g) return {type: 'rcd', id: e.g.id, sel: `group:${e.g.id}`, name: `${e.g.rcdForm === 'rcd' ? 'HPFI' : 'Kombiafbryder'} i ${e.board.name} · ${e.g.name}`, text: `udløste (${what})`};
+  return {type: 'rcd', id: e.owner.id, sel: `${app.idx[e.owner.id].type}:${e.owner.id}`, name: `HPFI i ${e.owner.name}`, text: `udløste (${what})`};
 };
 // Hver beregning får et nyt nummer, så viserdiagrammet kan se, om det er lige efter en ændring
 app.gen = 0;
 app.solve = () => {
   reindex();
   app.fixPhases();
-  app.res = M.compute(app.net, app.opts);
+  app.res = M.compute(app.net, Object.assign({}, app.opts, {surge: app.surge && app.surge.length ? new Set(app.surge) : null}));
+  app.surge = null;
   app.gen++;
   for (const e of app.res.events) app.eventLog.push(Object.assign(app.eventText(e), {t: e.at}));
 };
@@ -215,7 +235,7 @@ function tavle(kind, o) {
     : (o.phases.length === 3 ? '3-faset' : o.phases.join('+')) + (app.isLocal(app.idx[o.id] && app.idx[o.id].bldg) ? ' · nullet' : '');
   let peTxt = pe !== null && pe >= 5 ? `<span class="pe-w${pe >= 50 ? ' danger' : ''}">PE ${fmt(pe, 0)} V mod jord</span>` : '';
   let sens = null;
-  if (o.rcd !== 'none' && !o.rcdTripped) { const rs = app.res.residual(o.groups); sens = M.rcdSens(o.rcdType, M.rcdParams(o.name, o.rcd), rs.dc).status; }
+  if (o.rcd !== 'none' && !o.rcdTripped) { const rs = app.res.residual(M.rcdGroups(o)); sens = M.rcdSens(o.rcdType, M.rcdParams(o.name, o.rcd), rs.dc).status; }
   const badges = [o.rcd === 'none' ? '<span class="badge-s">ingen HPFI</span>' : o.rcdTripped ? '<span class="badge-s trip">HPFI udløst</span>'
     : sens === 'blind' ? '<span class="badge-s trip">HPFI blind</span>' : sens === 'nedsat' ? '<span class="badge-s warn">HPFI nedsat</span>' : '',
     o.earthBroken ? '<span class="badge-s trip">jordledning afbrudt</span>' : ''].join('');
@@ -234,7 +254,8 @@ function appChip(a) {
   const v = info.st === 'burned' ? 'brændt' : info.st === 'slukket' ? 'slukket' : info.st === 'dcstop' ? 'DC-stop' : info.st === 'off' ? '0 V' : `${fmt(info.v, 0)} V`;
   const g = app.idx[a.id].group, c = app.connOf(a);
   const tag = g.phases.length > 1 || def.kind !== 'LN' ? `<span class="app-ph">${!c ? '—' : c === '3D' ? '3×400' : c === '3' ? '3~' : c.replace('-', '–')}</span>` : '';
-  return `<button type="button" class="app st-${info.st}${isSel('app', a.id)}" data-sel="app:${a.id}" title="${esc(def.name)}: ${M.connLabel(c)}, ${v}"><span class="st-dot"></span>${tag}<span class="app-n">${esc(def.name)}</span><span class="app-v">${v}</span></button>`;
+  const n = M.appQty(a), nm = `${n > 1 ? `${n} × ` : ''}${esc(def.name)}`;
+  return `<button type="button" class="app st-${info.st}${isSel('app', a.id)}" data-sel="app:${a.id}" title="${nm}: ${M.connLabel(c)}, ${v}"><span class="st-dot"></span>${tag}<span class="app-n">${nm}</span><span class="app-v">${v}</span></button>`;
 }
 // Etage og side ud fra navnet, fx "St. tv", "1. th", "4. mf"
 const parseFloor = name => {
@@ -271,7 +292,7 @@ function groups(o) {
   return `<div class="grps">${o.groups.map((g, i) => `<div class="grp${isSel('group', g.id) || isSel('cable', g.id)}">
       <button type="button" class="cable g${isSel('cable', g.id)}" data-sel="cable:${g.id}" aria-label="Gruppeledning ${esc(g.name)}"><span class="wires">${wires(g.id, 'group', g)}</span></button>
       <div class="grp-b">
-        <button type="button" class="grp-h" data-sel="group:${g.id}"><span class="ph" style="--c:${g.phases.length > 1 ? 'var(--ink)' : `var(--l${g.phases[0][1]})`}">${g.phases.length === 3 ? '3~' : g.phases.join('+')}</span>G${i + 1} ${esc(g.name)}${cutText(g, g.id)}${g.tripped ? '<span class="badge-s trip">udløst</span>' : ''}${g.fault ? (g.fault.pair.startsWith('ARC') ? '<span class="badge-s trip">lysbue</span>' : '<span class="badge-s warn">isolationsfejl</span>') : ''}${g.afdd ? '<span class="badge-s">AFDD</span>' : ''}${groupIk(g)}</button>
+        <button type="button" class="grp-h" data-sel="group:${g.id}"><span class="ph" style="--c:${g.phases.length > 1 ? 'var(--ink)' : `var(--l${g.phases[0][1]})`}">${g.phases.length === 3 ? '3~' : g.phases.join('+')}</span>G${i + 1} ${esc(g.name)}${cutText(g, g.id)}${g.tripped ? '<span class="badge-s trip">udløst</span>' : ''}${g.fault ? (g.fault.pair.startsWith('ARC') ? '<span class="badge-s trip">lysbue</span>' : '<span class="badge-s warn">isolationsfejl</span>') : ''}${g.afdd ? '<span class="badge-s">AFDD</span>' : ''}${M.ownRcd(g) ? (g.rcdTripped ? `<span class="badge-s trip">${g.rcdForm === 'rcd' ? 'HPFI' : 'RCBO'} udløst</span>` : `<span class="badge-s">${g.rcdForm === 'rcd' ? 'HPFI' : 'RCBO'}</span>`) : ''}${groupIk(g)}</button>
         <div class="apps">${g.apps.map(appChip).join('')}<button type="button" class="app-add" data-sel="group:${g.id}" aria-label="Tilføj apparat i ${esc(g.name)}">+</button></div>
       </div></div>`).join('')}
     <button type="button" class="mini-add" data-act="addGroup" data-id="${o.id}">+ Gruppe</button></div>`;
@@ -324,7 +345,7 @@ function renderSummary() {
       each(o);
       if (o.rcdTripped) trips++;
       if (o.earthBroken) faults++;
-      o.groups.forEach(g => { each(g); burned += g.apps.filter(a => a.burned).length; if (g.tripped) trips++; if (g.fault) faults++; });
+      o.groups.forEach(g => { each(g); burned += g.apps.filter(a => a.burned).length; if (g.tripped) trips++; if (g.rcdTripped) trips++; if (g.fault) faults++; });
       for (const L of app.usedPhases(o.id)) { const v = app.boardV(o.id, L); if (v !== null && v > maxV.v) maxV = {v, where: `${o.name}, ${L}`}; }
       const pe = app.touchV(o.id);
       if (pe !== null && pe > maxPE.v) maxPE = {v: pe, where: o.name};
@@ -381,7 +402,8 @@ app.clearFaults = () => {
   });
 };
 app.resetTrips = () => {
-  tavler().forEach(o => { o.rcdTripped = false; o.groups.forEach(g => { g.tripped = false; g.apps.forEach(a => { a.dcTripped = false; }); }); });
+  app.energize(tavler().flatMap(o => o.groups.filter(g => g.tripped || (M.ownRcd(g) ? g.rcdTripped : o.rcdTripped))));
+  tavler().forEach(o => { o.rcdTripped = false; o.groups.forEach(g => { g.tripped = false; g.rcdTripped = false; g.apps.forEach(a => { a.dcTripped = false; }); }); });
   app.eventLog = app.eventLog.filter(e => e.type === 'burn');
 };
 app.load = (net, nulling = true) => { app.net = net; app.eventLog = []; app.sel = null; app.setNulling(nulling); };

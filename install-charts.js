@@ -147,5 +147,56 @@ function tcSVG(prot, points) {
   return s + '</svg>';
 }
 
-window.InstUI = {fmt, fmtS, fmtA, esc, sub, PHC, phasorSVG, scopeSVG, spectrumSVG, tcSVG};
+/* Lækstrømmene fra hver fase som visere i mA og deres sum, som HPFI'en ser.
+   o.ph: [{k, I}] med komplekse strømme, o.other: fejlstrøm, der ikke er lækstrøm fra apparater (fx en isolationsfejl).
+   Viserne tegnes fra midten og desuden i forlængelse af hinanden (stiplet), så man kan se, hvordan de ophæver hinanden. */
+function arrowSVG(x0, y0, x1, y1, color, w, dash) {
+  const L = Math.hypot(x1 - x0, y1 - y0);
+  if (L < 3) return '';
+  const ux = (x1 - x0) / L, uy = (y1 - y0) / L, hl = Math.min(9, L * 0.45), hw = hl / 2;
+  return `<line x1="${r1(x0)}" y1="${r1(y0)}" x2="${r1(x1 - ux * hl * .8)}" y2="${r1(y1 - uy * hl * .8)}" stroke="${color}" stroke-width="${w}" stroke-linecap="round"${dash ? ` stroke-dasharray="${dash}" stroke-opacity=".75"` : ''}/>` +
+    `<polygon points="${r1(x1)},${r1(y1)} ${r1(x1 - ux * hl - uy * hw)},${r1(y1 - uy * hl + ux * hw)} ${r1(x1 - ux * hl + uy * hw)},${r1(y1 - uy * hl - ux * hw)}" fill="${color}"${dash ? ' fill-opacity=".75"' : ''}/>`;
+}
+function leakSVG(o) {
+  const parts = o.ph.filter(p => Math.hypot(p.I.re, p.I.im) > 1e-4).map(p => ({c: PHC[p.k], I: p.I, t: `L${p.k + 1} ${fmt(Math.hypot(p.I.re, p.I.im), 1)} mA`}));
+  if (o.other && Math.hypot(o.other.re, o.other.im) > 0.05) parts.push({c: 'var(--warn)', I: o.other, t: `fejl ${fmt(Math.hypot(o.other.re, o.other.im), 1)} mA`});
+  const sum = parts.reduce((a, p) => ({re: a.re + p.I.re, im: a.im + p.I.im}), {re: 0, im: 0}), cum = [];
+  parts.reduce((a, p) => { const b = {re: a.re + p.I.re, im: a.im + p.I.im}; cum.push(b); return b; }, {re: 0, im: 0});
+  const ext = Math.max(0.5, ...parts.map(p => Math.hypot(p.I.re, p.I.im)), ...cum.map(p => Math.hypot(p.re, p.im))) * 1.18;
+  const cx = 150, cy = 118, S = 92 / ext, X = p => cx + p.re * S, Y = p => cy - p.im * S;
+  let s = `<svg viewBox="0 0 300 236" class="leak-svg" role="img" aria-label="Lækstrømmene fra faserne som visere og deres sum">`;
+  s += `<line x1="${cx - 104}" y1="${cy}" x2="${cx + 104}" y2="${cy}" stroke="var(--grid)"/><line x1="${cx}" y1="${cy - 104}" x2="${cx}" y2="${cy + 104}" stroke="var(--grid)"/>`;
+  // I forlængelse af hinanden
+  let a = {re: 0, im: 0};
+  if (parts.length > 1) parts.forEach((p, i) => { const b = cum[i]; s += arrowSVG(X(a), Y(a), X(b), Y(b), p.c, 1.6, '4 3'); a = b; });
+  // Fra midten, med navn og størrelse uden for spidsen
+  for (const p of parts) {
+    const tip = {re: p.I.re, im: p.I.im}, x1 = X(tip), y1 = Y(tip), ox = x1 - cx, oy = y1 - cy, ol = Math.hypot(ox, oy) || 1;
+    s += arrowSVG(cx, cy, x1, y1, p.c, 2.4);
+    s += `<text x="${r1(Math.min(262, Math.max(38, x1 + ox / ol * 30)))}" y="${r1(y1 + oy / ol * 13)}" text-anchor="middle" dominant-baseline="middle" class="ph-lbl" fill="${p.c}">${p.t}</text>`;
+  }
+  const sm = Math.hypot(sum.re, sum.im);
+  if (sm * S > 4) s += arrowSVG(cx, cy, X(sum), Y(sum), 'var(--combo)', 3.4);
+  s += `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--ink)"/>`;
+  s += `<text x="150" y="230" text-anchor="middle" class="ph-lbl" fill="var(--combo)">I<tspan baseline-shift="sub" font-size="8">Δ</tspan> = ${fmt(sm, sm < 10 ? 1 : 0)} mA${parts.length > 1 ? ' (summen af viserne)' : ''}</text>`;
+  return s + '</svg>';
+}
+/* Lækstrømmen i forhold til HPFI'ens I_ΔN: I orden under 30 %, for høj til 50 %, kan udløse fra 50 % */
+function rcdGaugeSVG(mA, IdN, surge) {
+  const L = 14, R = 306, T = 26, H = 12, X = v => r1(L + Math.min(v / IdN, 1.04) / 1.04 * (R - L));
+  let s = `<svg viewBox="0 0 320 70" class="gauge" role="img" aria-label="Lækstrøm ${fmt(mA, 1)} mA af ${fmt(IdN, 0)} mA">`;
+  [[0, .3, 'var(--good)'], [.3, .5, 'var(--warn)'], [.5, 1, 'var(--bad)']].forEach(([a, b, c]) => { s += `<rect x="${X(a * IdN)}" y="${T}" width="${r1(X(b * IdN) - X(a * IdN))}" height="${H}" fill="${c}" fill-opacity=".22"/>`; });
+  s += `<rect x="${L}" y="${T}" width="${r1(X(IdN) - L)}" height="${H}" fill="none" stroke="var(--line)" rx="2"/>`;
+  for (const f of [0, .3, .5, 1]) s += `<line x1="${X(f * IdN)}" y1="${T}" x2="${X(f * IdN)}" y2="${T + H + 4}" stroke="var(--axis)"/><text x="${X(f * IdN)}" y="${T + H + 14}" text-anchor="${f === 1 ? 'end' : f ? 'middle' : 'start'}" class="sc-lbl">${f === 1 ? `${fmt(IdN, 0)} mA` : f ? `${fmt(f * IdN, IdN * f % 1 ? 1 : 0)}` : '0'}</text>`;
+  if (surge > 0) {
+    const xs = X(mA + surge);
+    s += `<line x1="${X(mA)}" y1="${T + H / 2}" x2="${xs}" y2="${T + H / 2}" stroke="var(--ink)" stroke-dasharray="2 2"/><circle cx="${xs}" cy="${T + H / 2}" r="4" fill="var(--panel)" stroke="var(--ink)" stroke-width="1.5"/>`;
+  }
+  const xm = X(mA);
+  s += `<polygon points="${xm},${T - 1} ${r1(xm - 5)},${T - 9} ${r1(xm + 5)},${T - 9}" fill="var(--ink)"/>`;
+  s += `<text x="${Math.min(R, Math.max(L, xm))}" y="${T - 13}" text-anchor="${xm > R - 30 ? 'end' : xm < L + 30 ? 'start' : 'middle'}" class="tc-lbl" fill="var(--ink)">${fmt(mA, 1)} mA</text>`;
+  return s + '</svg>';
+}
+
+window.InstUI = {fmt, fmtS, fmtA, esc, sub, PHC, phasorSVG, scopeSVG, spectrumSVG, tcSVG, leakSVG, rcdGaugeSVG};
 })();

@@ -100,23 +100,34 @@ const APPL = [
   {id: 'komfur', name: 'Komfur (plader og ovn)', cat: '3-faset', three: true, neutral: true, perPhase: [2000, 1800, 2500], cos: 1, harm: 'none', vMax: 320, info: '3-faset med nul. Pladerne sidder mellem hver fase og nul, så de rammes af manglende nul.'},
   {id: 'induktion', name: 'Induktionskogeplade', cat: '3-faset', three: true, neutral: true, perPhase: [3700, 3700, 0], cos: .98, harm: 'induk', vMin: 180, vMax: 285, info: '2-faset med nul. Elektronik med ensretter.'},
   {id: 'varmepumpe', name: 'Varmepumpe', cat: '3-faset', three: true, neutral: false, perPhase: [1200, 1200, 1200], cos: .95, harm: 'vfd', vMin: 195, vMax: 280, info: '3-faset uden nul, så manglende nul rammer den ikke. Ved fasebrud kører den på to faser og bliver varm.'},
+  {id: 'ledarm', name: 'LED-armatur', cat: 'Armaturer', lum: true, P: 40, cos: .95, harm: 'pfc', vMin: 150, vMax: 300, info: 'Armatur i klasse I med LED-driver. Driverens EMC-filter har kondensatorer mellem fase og PE, så der løber en lille lækstrøm.'},
+  {id: 'downlight', name: 'LED-downlight', cat: 'Armaturer', lum: true, P: 10, cos: .9, harm: 'led', vMin: 150, vMax: 290, info: 'Lille indbygningsspot i klasse I med egen driver. Mange downlights er klasse II og har ingen lækstrøm til PE.'},
+  {id: 'lysstof', name: 'Lysstofarmatur med HF-forkobling', cat: 'Armaturer', lum: true, P: 58, cos: .97, harm: 'pfc', vMin: 180, vMax: 290, info: 'Armatur i klasse I med elektronisk forkobling (HF). Forkoblingens EMC-filter giver lækstrøm til PE.'},
+  {id: 'highbay', name: 'LED high-bay (hal)', cat: 'Armaturer', lum: true, P: 150, cos: .95, harm: 'pfc', vMin: 150, vMax: 300, info: 'Stort armatur til haller og lagre. Den kraftige driver har et større EMC-filter og dermed større lækstrøm.'},
   {id: 'elbil', name: 'Elbillader 11 kW', cat: '3-faset', three: true, neutral: false, perPhase: [3680, 3680, 3680], cos: .99, harm: 'pfc', vMin: 195, vMax: 280, info: '3-faset uden nul, med aktiv PFC.'},
 ];
 // Typisk lækstrøm til PE i normal drift [mA] for apparater i beskyttelsesklasse I (klasse II-apparater har ingen PE).
 // Varmelegemer lækker gennem isolationen (resistivt), elektronik gennem EMC-filtrenes kondensatorer (kapacitivt).
 const LEAK_MA = {koleskab: .3, fryser: .3, ovn: 1.5, mikro: .5, elkedel: .3, kaffe: .3, opvask: 1, emhaette: .2, pc: 1, led: .1,
   vask: 1.5, tumbler: 1, elpanel: .5, vvb: 1.5, gulvvarme: .5, komfur: 1.5, induktion: 1.5, varmepumpe: 3.5, elbil: 1,
-  vvb400: 1.5, radiator400: .5, sauna: 1, gennem: 1};
+  vvb400: 1.5, radiator400: .5, sauna: 1, gennem: 1, ledarm: .5, downlight: .25, lysstof: .5, highbay: 1};
 const LEAK_RES = new Set(['ovn', 'elkedel', 'kaffe', 'opvask', 'vask', 'tumbler', 'elpanel', 'vvb', 'gulvvarme', 'komfur', 'vvb400', 'radiator400', 'sauna', 'gennem']);
+// Indkoblingsspids pr. armatur [mA]: når der tændes, lades EMC-filtrenes kondensatorer op på én gang. Spidsen varer
+// under et par millisekunder. Det er forenklede undervisningsværdier, som HPFI'en ser oven i lækstrømmen.
+const SURGE_MA = {ledarm: .5, downlight: .3, lysstof: .4, highbay: 1};
 // Apparater med elektronik, der kan give glat DC-fejlstrøm
 const DC_CAP = new Set(['varmepumpe', 'elbil']);
 // kind: LN = 230 V fase–nul, LL = 400 V mellem faser (eller 3 × 400 V), YN = flere faser med nul (komfur), 3W = 3-faset uden nul
 APPL.forEach(a => {
-  Object.assign(a, {leak: LEAK_MA[a.id] || 0, leakRes: LEAK_RES.has(a.id), dcCap: DC_CAP.has(a.id), U: a.U || U_NOM});
+  Object.assign(a, {leak: LEAK_MA[a.id] || 0, leakRes: LEAK_RES.has(a.id), surge: SURGE_MA[a.id] || 0, dcCap: DC_CAP.has(a.id), U: a.U || U_NOM});
   a.kind = a.U === 400 ? 'LL' : a.three ? (a.neutral ? 'YN' : '3W') : 'LN';
 });
 const APPL_BY_ID = Object.fromEntries(APPL.map(a => [a.id, a]));
 const defTotal = d => d.three ? d.perPhase.reduce((s, p) => s + p, 0) : d.P;
+// Armaturer kan sidde flere ens på samme kontakt (qty). P og lækstrømmen er pr. stk.; a.leak retter typens værdi.
+const appQty = a => a.qty > 1 ? a.qty : 1;
+const appLeak = a => a.leak != null ? a.leak : APPL_BY_ID[a.type].leak;
+const appPtot = a => a.P * appQty(a);
 
 /* ---------- Tilslutning af brugsgenstande ---------- */
 const toPhases = x => Array.isArray(x) ? PH.filter(p => x.includes(p)) : x === '3' ? PH.slice() : [x];
@@ -190,12 +201,17 @@ const rdcddTime = mA => mA < 6 ? Infinity : mA >= 200 ? 0.1 : mA >= 60 ? 0.3 : M
 let uid = 0;
 const nid = p => `${p}${++uid}`;
 const cable = (type, len) => ({type, len, broken: {}});
-const app = type => ({id: nid('a'), type, on: true, burned: false, P: defTotal(APPL_BY_ID[type]), dc: 0, dcTripped: false, rdcdd: type === 'elbil'});
+const app = (type, qty = 1) => ({id: nid('a'), type, on: true, burned: false, P: defTotal(APPL_BY_ID[type]), qty, leak: null, dc: 0, dcTripped: false, rdcdd: type === 'elbil'});
 const group = (name, phase, apps, cab, prot) => {
   const phases = toPhases(phase);
-  return {id: nid('g'), name, phases, cable: cab || cable(phases.length > 1 ? 'Cu2.5' : 'Cu1.5', 15), apps: apps.map(app), prot, fault: null, tripped: false, afdd: false};
+  return {id: nid('g'), name, phases, cable: cab || cable(phases.length > 1 ? 'Cu2.5' : 'Cu1.5', 15), apps: apps.map(x => typeof x === 'string' ? app(x) : x), prot, fault: null, tripped: false, afdd: false,
+    rcd: 'none', rcdForm: 'rcbo', rcdType: 'A', rcdDelay: false, rcdTripped: false};
 };
-const tavle = {rcd: '30', rcdType: 'A', rcdTripped: false};
+// rcd i en gruppe: 'none' = gruppen sidder bag tavlens fælles HPFI, '30' = egen HPFI eller kombiafbryder (rcdForm 'rcd' eller 'rcbo')
+const tavle = {rcd: '30', rcdType: 'A', rcdDelay: false, rcdTripped: false};
+const ownRcd = g => !!g.rcd && g.rcd !== 'none';
+// Tavlens fælles HPFI beskytter de grupper, der ikke har deres egen
+const rcdGroups = o => o.groups.filter(g => !ownRcd(g));
 const house = (name, earthing, groups, cab, RA = 25) => Object.assign({id: nid('b'), kind: 'hus', name, earthing, RA, earthBroken: false, split: 'main', cable: cab || cable('Al50', 25), groups, units: []}, tavle);
 // split: 'main' = PEN deles i hovedtavlen, 'local' = PEN fortsætter op i stigeledningerne med lokal nulling i lejlighederne
 const etage = (name, earthing, groups, units, cab, RA = 25, split = 'main') => Object.assign({id: nid('b'), kind: 'etage', name, earthing, RA, earthBroken: false, split, cable: cab || cable('Al95', 20), groups, units}, tavle);
@@ -310,6 +326,19 @@ const SCENARIOS = {
       ]),
     ]),
   ]},
+  // Lys 1–3 sidder bag tavlens fælles 4P HPFI. Lys hal og Kontor har hver sin kombiafbryder.
+  hal: {name: 'Værkstedshal med LED-armaturer (lækstrøm og HPFI)', nulling: true, make: () => {
+    const lum = (n, conn) => Object.assign(app('ledarm', n), conn ? {conn} : {});
+    const own = g => Object.assign(g, {rcd: '30', rcdForm: 'rcbo'});
+    const b = Object.assign(house('Værkstedshal', 'TNCS', [
+      group('Lys 1', 'L1', [lum(10)], cable('Cu1.5', 30), 'B10'),
+      group('Lys 2', 'L2', [lum(10)], cable('Cu1.5', 30), 'B10'),
+      group('Lys 3', 'L3', [lum(10)], cable('Cu1.5', 30), 'B10'),
+      own(group('Lys hal', '3', [lum(12, 'L1'), lum(12, 'L2'), lum(12, 'L3')], cable('Cu2.5', 40), 'B10')),
+      own(group('Kontor', 'L1', ['pc', 'laptop', 'kaffe'])),
+    ], cable('Al50', 30)), {kind: 'hal'});
+    return [ks('Kabelskab 1', cable('Al150', 90), [b])];
+  }},
   husTT: {name: 'Hus uden nulling (TT, jordspyd)', nulling: false, make: () => husNet('TT', 40)},
   etageTT: {name: 'Etageejendom uden nulling (TT, fælles jordspyd)', nulling: false, make: () => etageNet('TT', 15)},
   opgangTT: {name: 'Opgang uden nulling (TT, 2 faser)', nulling: false, make: () => opgangNet('TT', 'main')},
@@ -358,25 +387,25 @@ function build(feeders, nulling = true) {
     const def = APPL_BY_ID[a.type];
     const active = a.on && !a.burned && !a.dcTripped;
     const list = appEl[a.id] = [];
-    const scale = a.P / defTotal(def);
+    const Ptot = appPtot(a), leakMA = appLeak(a) * appQty(a), scale = Ptot / defTotal(def);
     const mk = (na, nb, P, lbl, Un, star) => {
       const Q = P * Math.tan(Math.acos(def.cos)), s2 = P * P + Q * Q;
       const e = {a: na, b: nb, R: Un * Un * P / s2, X: Un * Un * Q / s2, P, k: PH.indexOf(lbl.slice(0, 2)), lbl, Un, def, app: a, active, star,
         nonlinear: Object.keys(HP[def.harm].h).length > 0, inj: {}};
       list.push(e); elems.push(e);
       // Lækstrøm fra fasen til PE: en modstand (varmelegemer) eller en lille kapacitet (EMC-filtre)
-      if (active && def.leak && G.PE !== undefined) {
-        const I = def.leak / 1000 * P / a.P;
-        e.leak = def.leakRes ? addZ(na, G.PE, U_NOM / I, 0, {kind: 'leak', app: a.id})
-          : addZ(na, G.PE, 0, -U_NOM / I, {kind: 'leak', cap: true, app: a.id});
+      if (active && leakMA > 0 && G.PE !== undefined) {
+        const I = leakMA / 1000 * P / Ptot, L = lbl.slice(0, 2);
+        e.leak = def.leakRes ? addZ(na, G.PE, U_NOM / I, 0, {kind: 'leak', app: a.id, L})
+          : addZ(na, G.PE, 0, -U_NOM / I, {kind: 'leak', cap: true, app: a.id, L});
       }
     };
     const conn = normConn(def, a.conn, PH.filter(p => G[p] !== undefined));
     if (!conn) return;
-    if (def.kind === 'LN') mk(G[conn], G.N, a.P, conn, U_NOM, false);
+    if (def.kind === 'LN') mk(G[conn], G.N, Ptot, conn, U_NOM, false);
     else if (def.kind === 'LL') {
       const pairs = conn === '3D' ? [['L1', 'L2'], ['L2', 'L3'], ['L3', 'L1']] : [conn.split('-')];
-      for (const [p, q] of pairs) mk(G[p], G[q], a.P / pairs.length, `${p}–${q}`, 400, false);
+      for (const [p, q] of pairs) mk(G[p], G[q], Ptot / pairs.length, `${p}–${q}`, 400, false);
     } else if (def.kind === 'YN') {
       // Elementerne fordeles på de valgte faser: element nr. i kommer på fase nr. i mod antallet af faser
       const ch = conn.split('+');
@@ -396,7 +425,7 @@ function build(feeders, nulling = true) {
       const G = {N: node(g.id + '.N')};
       for (const p of phases) G[p] = node(g.id + '.' + p);
       const arc = g.fault && g.fault.pair.startsWith('ARC') ? g.fault.pair : null;
-      connect(Tv, G, g.cable, [...phases, 'N'], g.id, 'group', g.tripped || owner.rcdTripped, arc === 'ARC-S' ? {[phases[0]]: R_ARC_S} : null);
+      connect(Tv, G, g.cable, [...phases, 'N'], g.id, 'group', g.tripped || (ownRcd(g) ? g.rcdTripped : owner.rcdTripped), arc === 'ARC-S' ? {[phases[0]]: R_ARC_S} : null);
       if (arc === 'ARC-P' && phases.length) addZ(G[phases[0]], G.N, R_ARC_P, 0, {kind: 'arc', owner: g.id});
       if (Tv.PE !== undefined) {
         const [R, X] = zOf(g.cable);
@@ -412,7 +441,9 @@ function build(feeders, nulling = true) {
       prot.push({g, owner});
       for (const a of g.apps) addApp(G, a);
     }
-    rcds.push({owner, groups});
+    // Tavlens fælles HPFI og gruppernes egne. key giver hver HPFI sin faste udløsestrøm.
+    rcds.push({dev: owner, board: owner, groups: groups.filter(g => !ownRcd(g)), key: owner.name});
+    for (const g of groups) if (ownRcd(g)) rcds.push({dev: g, board: owner, groups: [g], key: `${owner.name} · ${g.name}`});
   }
 
   // Transformer: Norton-ækvivalent pr. fase mellem fasen og stjernepunktet
@@ -646,7 +677,18 @@ function residualOf(ckt, V, groups) {
     for (const k of ['L1', 'L2', 'L3', 'N']) if (c.br[k] !== undefined) { const I = brCur(ckt, V, c.br[k]); re += I.re; im += I.im; }
     if (!c.off && c.pe !== undefined) for (const a of g.apps) if (a.on && !a.burned && !a.dcTripped && a.dc) dc += a.dc / 1000;
   }
-  return {ac: Math.hypot(re, im), dc};
+  return {ac: Math.hypot(re, im), dc, I: {re, im}};
+}
+
+// Indkoblingsspids [A] fra de armaturer i grupperne, der lige er tændt (ids), eller fra alle tændte (ids = null)
+function surgeOf(ckt, groups, ids) {
+  let s = 0;
+  for (const g of groups) {
+    const c = ckt.cables[g.id];
+    if (c.off || c.pe === undefined) continue;
+    for (const a of g.apps) if ((!ids || ids.has(a.id)) && a.on && !a.burned && !a.dcTripped) s += APPL_BY_ID[a.type].surge * appQty(a) / 1000;
+  }
+  return s;
 }
 
 /* Beregn hele nettet. Efter hver beregning findes det, der sker hurtigst: en gruppeafbryder udløser, en HPFI
@@ -689,11 +731,18 @@ function compute(feeders, opts) {
         }
       }
       for (const r of ckt.rcds) {
-        if (r.owner.rcd === 'none' || r.owner.rcdTripped) continue;
-        const res = residualOf(ckt, V1, r.groups), P = rcdParams(r.owner.name, r.owner.rcd), T = RCD_TYPES[r.owner.rcdType] || RCD_TYPES.A;
-        if (T.dc && res.dc >= P.thrDC) { cand.push({type: 'rcd', t: P.t1, owner: r.owner, I: res.dc, dc: true}); continue; }
-        const s = rcdSens(r.owner.rcdType, P, res.dc);
-        if (res.ac >= s.thr) cand.push({type: 'rcd', t: res.ac >= 5 * P.IdN ? P.t5 : P.t1, owner: r.owner, I: res.ac});
+        const d = r.dev;
+        if (d.rcd === 'none' || d.rcdTripped || !r.groups.length) continue;
+        const res = residualOf(ckt, V1, r.groups), P = rcdParams(r.key, d.rcd), T = RCD_TYPES[d.rcdType] || RCD_TYPES.A;
+        const ev = {type: 'rcd', owner: d, board: r.board, g: d === r.board ? null : d};
+        if (T.dc && res.dc >= P.thrDC) { cand.push(Object.assign(ev, {t: P.t1, I: res.dc, dc: true})); continue; }
+        const s = rcdSens(d.rcdType, P, res.dc);
+        if (res.ac >= s.thr) cand.push(Object.assign(ev, {t: res.ac >= 5 * P.IdN ? P.t5 : P.t1, I: res.ac}));
+        // Indkoblingsspidsen kommer kun i det øjeblik, der tændes. En korttidsforsinket HPFI reagerer ikke på den.
+        else if (it === 0 && opts.surge && !d.rcdDelay) {
+          const sp = surgeOf(ckt, r.groups, opts.surge);
+          if (sp > 0 && res.ac + sp >= s.thr) cand.push(Object.assign(ev, {t: 0.01, I: res.ac + sp, surge: true}));
+        }
       }
     }
     if (!cand.length) break;
@@ -743,6 +792,13 @@ function result(ckt, V, events, steps) {
   return {
     ckt, events, steps,
     residual: groups => residualOf(ckt, V[1], groups),
+    // Apparaternes lækstrømme fra hver fase til PE i grupperne (visere ved 50 Hz)
+    leakByPhase: groups => {
+      const ids = new Set(groups.flatMap(g => g.apps.map(a => a.id))), out = {L1: {re: 0, im: 0}, L2: {re: 0, im: 0}, L3: {re: 0, im: 0}};
+      ckt.br.forEach((b, i) => { if (b.kind === 'leak' && ids.has(b.app) && out[b.L]) { const I = brI(i, 1); out[b.L].re += I.re; out[b.L].im += I.im; } });
+      return out;
+    },
+    surge: groups => surgeOf(ckt, groups, null),
     // Kortslutningsstrømme for alle punkter; regnes første gang de bruges
     ik: () => ikCache || (ikCache = shortCircuit(ckt)),
     // Impedansen L–N uden belastning ved 20 °C og den simulerede kortslutningsstrøm med den aktuelle belastning
@@ -782,7 +838,7 @@ const sumSeries = list => HARM.map((h, i) => ({h, re: list.reduce((a, s) => a + 
 
 window.Inst = {
   HARM, U_NOM, E_SRC, ZT, RB, R_HEALTHY, CABLES, ROLE_CABLES, HP, APPL, APPL_BY_ID, SCENARIOS, defTotal,
-  protOf, mcbTime, rcdParams, RCD_TYPES, rcdSens, afddTime, rdcddTime, R_ARC_S, R_ARC_P,
+  protOf, mcbTime, rcdParams, RCD_TYPES, rcdSens, afddTime, rdcddTime, R_ARC_S, R_ARC_P, ownRcd, rcdGroups, appQty, appLeak, appPtot,
   PH, toPhases, connOptions, normConn, connLabel, unitOrder, C_MAX, C_MIN, R80,
   nid, cable, app, group, house, etage, unit, ks, compute,
   rms, h1, hn, thd, wave, sumSeries, cabs,

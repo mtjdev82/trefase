@@ -131,6 +131,21 @@ const TASKS = [
     answer: 'Ik,max er ca. 13 kA, så afbrydere med en brydeevne på 6 kA er ikke nok. Der skal bruges afbrydere med større brydeevne, eller en forsikring foran, der begrænser strømmen. Med 150 m fordelingskabel stiger impedansen, og Ik,max falder til omkring 5 kA. Ik,min falder tilsvarende, så det langt ude i nettet i stedet er udløsningen, man skal holde øje med.',
     scenario: 'hus',
     setup: () => { app.load(M.SCENARIOS.hus.make(), true); app.net[0].cable.len = 10; const b = bld('Hus 1'); b.cable.len = 5; return {sel: ['bldg', b.id]}; }},
+  {title: 'Hvor mange armaturer kan en HPFI tåle?',
+    text: 'I værkstedshallen er kun Lys 1 tændt: 10 LED-armaturer på L1 med 0,5 mA lækstrøm pr. stk. Gruppen sidder bag tavlens fælles 30 mA HPFI. Klik på armaturet, og sæt antallet op, fx 5 ad gangen. Hold øje med lækstrømmen i tavlens panel. Hvornår når den 30 % af I<sub>ΔN</sub>? Hvornår udløser HPFI\'en, og hvorfor først der? Kan du slå den til igen?',
+    answer: 'Med 0,5 mA pr. armatur er 9 mA (30 % af 30 mA) nået ved 18 armaturer. En 30 mA HPFI udløser et sted mellem 15 og 30 mA. Denne udløser ved ca. 19 mA, altså mellem 35 og 40 armaturer (ved 38). Når du slår den til igen, tændes alle armaturerne på én gang. Indkoblingsspidsen lægges oven i lækstrømmen, så den udløser med det samme. Sæt antallet ned til 18 og slå den til igen: så holder den. Ved 20 armaturer holder den i drift, men kan ikke slås til. Det er en af grundene til 30 %-reglen.',
+    scenario: 'hal',
+    setup: () => { app.loadScenario('hal'); const b = bld('Værkstedshal'); ['Lys 2', 'Lys 3'].forEach(n => grp(b, n).apps.forEach(a => { a.on = false; })); return {sel: ['app', grp(b, 'Lys 1').apps[0].id]}; }},
+  {title: 'Lækstrøm fra tre faser gennem én HPFI',
+    text: 'Lys 1, 2 og 3 har hver 10 LED-armaturer på hver sin fase bag tavlens fælles 4P HPFI. Mål lækstrømmen med tangen på én af grupperne og derefter på tavlen. Hvorfor ser HPFI\'en næsten ingenting? Sæt derefter antallet til 40 i alle tre grupper. Sluk så Lys 3 med "Sluk alle" i gruppens panel. Hvad sker der?',
+    answer: 'Hver gruppe har ca. 5 mA, men lækstrømmene er forskudt 120° og lægges sammen som visere, så HPFI\'en ser ca. 0 mA. Med 40 armaturer har hver gruppe ca. 20 mA, og HPFI\'en ser stadig næsten 0 mA. Når Lys 3 slukkes, er kun L1 og L2 tilbage. To lige store strømme forskudt 120° giver en sum, der er lige så stor som hver af dem, altså 20 mA, og HPFI\'en udløser (den udløser ved ca. 19 mA). Den udløser altså, fordi der blev slukket for noget. Slår du den til igen, udløser den straks, fordi de 20 mA stadig er der. Tænd Lys 3 igen, og slå den til: nu er lækstrømmen i drift ca. 0 mA, men indkoblingsspidsen fra 120 armaturer (ca. 60 mA) får den til at udløse alligevel. Løsningen er færre armaturer pr. HPFI eller en kombiafbryder i hver gruppe.',
+    scenario: 'hal',
+    setup: () => { app.loadScenario('hal'); return {sel: ['bldg', bld('Værkstedshal').id], meter: 'LEAK'}; }},
+  {title: 'Kombiafbryder og indkoblingsspids',
+    text: 'Lys hal har 3 × 12 LED-armaturer fordelt på L1, L2 og L3 bag en 4P kombiafbryder (3f+N). Tryk "Sluk alle" og derefter "Tænd alle på én gang". Tilføj så 12 LED-armaturer mere "fordelt på faserne", og sluk og tænd igen. Hvad sker der, og hvor stor er lækstrømmen i drift? Vælg derefter "Korttidsforsinket (G/KV)" under Fejlstrømsbeskyttelse, slå afbryderen til og prøv igen.',
+    answer: 'I drift er lækstrømmen ca. 0 mA, fordi de tre faser ophæver hinanden. Med 3 × 12 armaturer er indkoblingsspidsen ca. 18 mA, og kombiafbryderen holder (den udløser ved ca. 21 mA). Med 3 × 16 bliver spidsen ca. 24 mA, og den udløser ved tænding, selvom lækstrømmen i drift stadig er næsten 0. Polerne lukker ikke præcis samtidig, og spidsen er ikke en ren 50 Hz-strøm, så man kan ikke regne med, at spidserne fra faserne ophæver hinanden. Simulatoren lægger dem sammen. En korttidsforsinket kombiafbryder reagerer ikke på de korte spidser og holder. Den beskytter stadig mod jordfejl, fordi en fejlstrøm, der varer ved, udløser den.',
+    scenario: 'hal',
+    setup: () => { app.loadScenario('hal'); return {sel: ['group', grp(bld('Værkstedshal'), 'Lys hal').id]}; }},
 ];
 
 function run(i) {
