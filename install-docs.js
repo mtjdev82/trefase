@@ -256,16 +256,48 @@ const SECTIONS = [
     </ul>
     <p>Isolationsfejl findes med R ISO-målingen. Mål først på tavlen, og derefter på grupperne én ad gangen, indtil du finder gruppen med lav værdi.</p>`],
 
-  ['doc-laek', 'Lækstrømme', `
-    <p>Alle apparater i beskyttelsesklasse I leder en lille strøm til PE i normal drift. Elektronik har EMC-filtre med kondensatorer mellem fase og PE, og varmelegemer lækker lidt gennem isolationen, især når de er fugtige. Det er typisk under 1–2 mA pr. apparat, men HPFI'en ser summen af lækstrømmene i alle sine grupper.</p>
+  ['doc-laek', 'Lækstrømme og HPFI i trefasede anlæg', `
+    <p>Alle apparater i beskyttelsesklasse I leder en lille strøm til PE i normal drift. Elektronik har EMC-filtre med kondensatorer mellem fase og PE, og varmelegemer lækker lidt gennem isolationen, især når de er fugtige. Det er typisk under 1–2 mA pr. apparat. Klasse II-apparater (dobbeltisolerede, uden PE), fx de fleste opladere og fjernsyn, har ingen lækstrøm til PE.</p>
+    <h3>Hvad måler HPFI'en?</h3>
+    <p>Alle strømførende ledere går gennem HPFI'ens ringkerne: L1, L2, L3 og N i en 4-polet, L og N i en 2-polet. Kernen mærker kun summen af strømmene. Går al strømmen ud og tilbage gennem lederne, er summen nul, uanset hvor stor og hvor usymmetrisk belastningen er. Kun strøm, der finder en anden vej tilbage, typisk gennem PE eller jord, giver en sum, der ikke er nul. Det er fejlstrømmen.</p>
+    <div class="eq"><span>I<sub>Δ</sub> = I<sub>L1</sub> + I<sub>L2</sub> + I<sub>L3</sub> + I<sub>N</sub> (lagt sammen som visere)</span></div>
+    <p>Der er altså ikke en udløsestrøm pr. fase. En 4-polet HPFI på 30 mA ser én samlet fejlstrøm for alle tre faser og nul. Måles 18 mA med en lækstrømstang om alle de strømførende ledere ved HPFI'en, er det præcis den strøm, HPFI'en ser.</p>
+    <h3>Lækstrømme fra forskellige faser lægges sammen som visere</h3>
+    <p>Her kommer trefaset teori ind igen. Lækstrømmen fra et apparat på L1 følger spændingen på L1, et apparat på L2 følger L2 og så videre. Lækstrømmene er derfor forskudt 120° ligesom fasestrømmene og lægges sammen på samme måde som strømmene i nullederen. Er lækstrømmene af samme slags, fx alle kapacitive fra EMC-filtre, gælder samme formel som for nulstrømmen ved ohmsk belastning:</p>
+    <div class="eq"><span>I<sub>Δ</sub> = √(I<sub>1</sub>² + I<sub>2</sub>² + I<sub>3</sub>² − I<sub>1</sub>·I<sub>2</sub> − I<sub>2</sub>·I<sub>3</sub> − I<sub>3</sub>·I<sub>1</sub>)</span></div>
+    <p>Samme samlede lækstrøm på 18 mA giver derfor vidt forskellige fejlstrømme, alt efter hvordan den er fordelt på faserne:</p>
+    <div class="doc-tw"><table class="doc-t"><thead><tr><th>Lækstrøm på faserne</th><th>HPFI'en ser</th><th>30 mA HPFI</th></tr></thead><tbody>
+      <tr><td>18 mA på L1</td><td>18 mA</td><td>Kan udløse (over 15 mA)</td></tr>
+      <tr><td>9 mA på L1 og 9 mA på L2</td><td>9 mA</td><td>Holder, men lige på 30 %-grænsen</td></tr>
+      <tr><td>10 mA, 5 mA og 3 mA</td><td>6,2 mA</td><td>Holder</td></tr>
+      <tr><td>6 mA på hver fase</td><td>ca. 0 mA</td><td>Holder, i teorien</td></tr>
+    </tbody></table></div>
+    <p>Lækstrømme målt gruppe for gruppe kan derfor ikke bare lægges sammen. Tre grupper med 6 mA på hver sin fase giver ikke 18 mA gennem en fælles 4-polet HPFI.</p>
+    <h3>Derfor kan man ikke regne med, at de ophæver hinanden</h3>
     <ul>
-      <li><b>Samme fase:</b> lækstrømmene lægges sammen.</li>
-      <li><b>Forskellige faser:</b> de er forskudt 120° og ophæver delvist hinanden.</li>
-      <li><b>Kapacitiv og resistiv:</b> en kapacitiv lækstrøm (EMC-filter) er forskudt 90° i forhold til en resistiv (fugt, isolationsfejl). De lægges sammen som visere, så 6 mA og 8 mA giver 10 mA og ikke 14 mA.</li>
+      <li><b>Kapacitiv og resistiv:</b> en kapacitiv lækstrøm (EMC-filter) er forskudt 90° i forhold til en resistiv (fugt, isolationsfejl). De lægges sammen som visere, så 6 mA og 8 mA på samme fase giver 10 mA og ikke 14 mA.</li>
+      <li><b>Fordelingen ændrer sig:</b> slukkes lyset på L2 og L3, eller udløser en 1-polet gruppeafbryder, er lækstrømmen på L1 pludselig alene. Så ser HPFI'en den fuldt ud. En HPFI kan altså udløse, fordi der bliver slukket for noget.</li>
+      <li><b>Harmoniske og høje frekvenser:</b> EMC-filtre leder også strøm ved højere frekvenser. Den 3. harmoniske fra de tre faser er i fase og lægges direkte sammen, ligesom i nullederen.</li>
+      <li><b>Indkobling:</b> når mange armaturer tændes på én gang, lades EMC-filtrenes kondensatorer op samtidig. Det giver en kort strømspids til PE, som kan få HPFI'en til at udløse, selvom den stationære lækstrøm er lav. Det er en almindelig årsag til, at HPFI'en falder ud, når lyset tændes. Det hjælper med færre armaturer pr. HPFI, tænding i flere trin eller en korttidsforsinket HPFI (ofte mærket G eller KV). Fabrikanterne angiver ofte et højeste antal drivere pr. HPFI i databladet.</li>
     </ul>
-    <p>En 30 mA HPFI udløser et sted mellem 15 og 30 mA. Bruger lækstrømmene allerede en stor del af det, skal der kun en lille ekstra fejl til, før den udløser. Tommelfingerreglen er, at lækstrømmen højst bør være 30 % af I<sub>ΔN</sub>, altså 9 mA for en 30 mA HPFI. Det løses ved at fordele grupperne på flere HPFI'er og flere faser.</p>
-    <p>Lækstrømmen måles med en lækstrømstang omkring alle strømførende ledere. Tangen måler forskellen, altså det, der løber ud gennem PE. I simulatoren er det målefunktionen <b>Lækstrøm</b>, og tavlens panel viser lækstrømmen gennem HPFI'en.</p>
-    <p>Klasse II-apparater (dobbeltisolerede, uden PE), fx de fleste opladere og fjernsyn, har ingen lækstrøm til PE.</p>`],
+    <h3>Hvor meget lækstrøm må der være?</h3>
+    <p>En HPFI må ikke udløse under 0,5 · I<sub>ΔN</sub> og skal udløse ved I<sub>ΔN</sub>. En 30 mA HPFI udløser derfor et sted mellem 15 og 30 mA, og man ved ikke på forhånd hvor. Tommelfingerreglen er, at lækstrømmen bag en HPFI højst bør være 30 % af I<sub>ΔN</sub>, altså 9 mA for en 30 mA HPFI. Så er der plads til variationer, indkoblingsspidser og en lille ekstra fejl.</p>
+    <div class="doc-tw"><table class="doc-t"><thead><tr><th>Lækstrøm</th><th>30 mA HPFI</th><th>Betydning</th></tr></thead><tbody>
+      <tr><td>Under 30 % af I<sub>ΔN</sub></td><td>Under 9 mA</td><td>I orden</td></tr>
+      <tr><td>30–50 % af I<sub>ΔN</sub></td><td>9–15 mA</td><td>For høj. Udløser ikke, men der er ikke meget margin.</td></tr>
+      <tr><td>50–100 % af I<sub>ΔN</sub></td><td>15–30 mA</td><td>Kan udløse når som helst</td></tr>
+      <tr><td>Over I<sub>ΔN</sub></td><td>Over 30 mA</td><td>Skal udløse</td></tr>
+    </tbody></table></div>
+    <h3>4-polet HPFI, HPFI og gruppeafbryder eller kombiafbryder</h3>
+    <ul>
+      <li><b>4-polet HPFI foran flere grupper:</b> HPFI'en ser visersummen af lækstrømmene fra alle grupperne bag den. Fordel grupperne på faserne, så lækstrømmene ophæver hinanden mest muligt. Når den udløser, slukker alle grupperne.</li>
+      <li><b>4-polet gruppeafbryder og 4-polet HPFI til én trefaset gruppe, eller en 4-polet kombiafbryder (RCBO, 3f+N):</b> virker ens med hensyn til fejlstrøm. Kun gruppens egne lækstrømme tæller, og de ophæver delvist hinanden, når armaturerne er fordelt på de tre faser.</li>
+      <li><b>2-polet kombiafbryder (1f+N) i hver gruppe:</b> hver gruppe har sin egen HPFI. Lækstrømmene fra forskellige grupper lægges ikke sammen, men der er heller ingen ophævning inden for gruppen. Det giver færrest uønskede udløsninger, og en fejl slukker kun én gruppe.</li>
+    </ul>
+    <h3>Eksempel: LED-armaturer på en 30 mA HPFI</h3>
+    <p>Et LED-armatur i klasse I lækker typisk 0,3–1 mA. Med 0,5 mA pr. armatur, alle på samme fase, når lækstrømmen 9 mA (30 %) ved 18 armaturer, og fra 30 armaturer (15 mA) kan HPFI'en udløse. Fordeles de samme armaturer ligeligt på tre faser, ophæver 50 Hz-delen sig næsten. Indkoblingsstrømmen gør det alligevel klogt at holde sig til fabrikantens højeste antal pr. HPFI.</p>
+    <h3>I simulatoren</h3>
+    <p>Lækstrømmen måles med en lækstrømstang omkring alle strømførende ledere. Tangen måler forskellen, altså det, der løber ud gennem PE. I simulatoren er det målefunktionen <b>Lækstrøm</b>, og tavlens panel viser lækstrømmen gennem HPFI'en i mA og i procent af I<sub>ΔN</sub>. Simulatoren regner med 50 Hz-delen af lækstrømmene. Indkoblingsspidser og højfrekvente strømme er ikke med.</p>`],
 
   ['doc-harm', 'Harmoniske strømme', `
     <p>Ikke-lineære apparater som SMPS-strømforsyninger, LED-drivere og frekvensomformere trækker ikke en sinusformet strøm. En SMPS uden PFC lader sin kondensator op i korte pulser nær spændingens top. Pulserne kan skrives som en sum af sinuskurver med 50 Hz (grundtonen) og hele multipla: 150 Hz (3.), 250 Hz (5.), 350 Hz (7.) osv.</p>
