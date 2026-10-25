@@ -311,7 +311,7 @@
 }
 /* Berøringsskærme: større mål og ingen automatisk zoom på iPhone, når et felt får fokus */
 @media (pointer:coarse){
-  input,select,textarea{font-size:max(16px,1em)}
+  input,select,textarea{font-size:max(16px,1em)!important}
   .app{padding:5px 10px 5px 8px}
   .app-add,.mini-add{min-height:32px;min-width:32px}
   .chip{padding:6px 12px 6px 9px}
