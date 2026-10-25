@@ -431,7 +431,7 @@ function inspTrafo() {
   return head('Forsyning', 'Transformer 10/0,4 kV') + intro(INTRO.trafo, 'doc-net') +
     sec('Transformerkreds', `<label class="field">Udlagt til nulling (TN) <select data-field="nulling" data-id="trafo"><option value="1"${app.opts.nulling ? ' selected' : ''}>Ja</option><option value="0"${app.opts.nulling ? '' : ' selected'}>Nej, kun TT (jordspyd)</option></select></label>
       <p class="hint">Netselskabet bestemmer, om transformerkredsen er udlagt til nulling. Er den ikke det, skal alle installationer have jordspyd (TT) og beskyttes med HPFI. ${more('doc-jording')}</p>`) +
-    sec('', table([row('Mærkeeffekt', '400 kVA'), row('Kortslutningsspænding u<sub>k</sub>', '≈ 4 %'), row('Tomgangsspænding', `${M.E_SRC} V`), row('Driftsjord R<sub>B</sub>', `${M.RB} Ω`)])) +
+    sec('', table([row('Mærkeeffekt', '400 kVA'), row('Kortslutningsspænding u<sub>k</sub>', '≈ 4 %'), row('Tomgangsspænding', `${M.E_SRC} V`), row('Driftsjord R<sub>B</sub>', `${M.RB} Ω`)]) + `<p class="hint">u<sub>k</sub> er et mål for transformerens indre impedans og bestemmer, hvor stor kortslutningsstrømmen kan blive. R<sub>B</sub> er modstanden fra stjernepunktet til jord. ${more('doc-trafo')}</p>`) +
     sec('Spændinger', voltTable('trafo')) + sec('', phasor('trafo')) + ikSection('trafo', 'trafo') +
     (f ? sec('Strøm ud i fordelingskablet', currentRows(f.id) + currentScope(f.id)) : '');
 }

@@ -134,7 +134,7 @@ const SECTIONS = [
 
   ['doc-net', 'Fra transformer til stikkontakt', `
     <dl class="doc-dl">
-      <dt>Transformer</dt><dd>Omsætter 10 kV til 0,4 kV. Sekundærsiden er stjernekoblet, og stjernepunktet er jordet med driftsjorden R<sub>B</sub>. I simulatoren: 400 kVA, u<sub>k</sub> ≈ 4 %, 233 V i tomgang og R<sub>B</sub> = 2 Ω.</dd>
+      <dt>Transformer</dt><dd>Omsætter 10 kV til 0,4 kV. Sekundærsiden er stjernekoblet, og stjernepunktet er jordet med driftsjorden R<sub>B</sub>. I simulatoren: 400 kVA, kortslutningsspænding u<sub>k</sub> ≈ 4 %, 233 V i tomgang og R<sub>B</sub> = 2 Ω. Se <button type="button" class="link" data-doc="doc-trafo">Transformerens mærkedata</button>.</dd>
       <dt>Fordelingskabel</dt><dd>Firelederkabel (L1, L2, L3 og PEN) i aluminium fra transformeren ud gennem kabelskabene. Kablet til det næste kabelskab forsynes gennem det forrige, så en fejl tidligt i kæden rammer alle længere ude.</dd>
       <dt>Kabelskab</dt><dd>Fordelingspunkt i vejen, hvor stikledningerne til bygningerne er tilsluttet.</dd>
       <dt>Stikledning</dt><dd>Kablet fra kabelskabet til bygningens hovedtavle. I TN-C-S er fjerde leder en PEN-leder, i TT en nulleder.</dd>
@@ -143,6 +143,12 @@ const SECTIONS = [
       <dt>Undertavle / gruppetavle</dt><dd>Tavlen i lejligheden med gruppeafbrydere og HPFI.</dd>
       <dt>Gruppe og gruppeledning</dt><dd>En gruppe er en strømkreds med egen gruppeafbryder, fx "Køkken". Gruppeledningen går fra tavlen til stikkontakter og faste udtag.</dd>
     </dl>
+    <h3 id="doc-trafo" tabindex="-1">Transformerens mærkedata</h3>
+    <p><b>u<sub>k</sub>, kortslutningsspændingen,</b> er et mål for transformerens indre impedans. Den måles ved at kortslutte den ene vikling og hæve spændingen på den anden, til der løber mærkestrøm. Den spænding, der skal til, angives i procent af mærkespændingen. Ved 4 % er det 400 V af de 10 kV, eller 16 V af de 400 V regnet på sekundærsiden. Det skrives med lille u, fordi det er et forhold og ikke en spænding i volt.</p>
+    <div class="eq"><span>I<sub>n</sub> = S<sub>n</sub> / (√3 · U<sub>n</sub>) = 400 kVA / (√3 · 400 V) ≈ 577 A</span><span>Z<sub>T</sub> = u<sub>k</sub> · U<sub>n</sub>² / S<sub>n</sub> = 0,04 · (400 V)² / 400 kVA = 16 mΩ</span><span>Ik ≈ I<sub>n</sub> / u<sub>k</sub> = 577 A / 0,04 ≈ 14 kA</span></div>
+    <p>Ved en kortslutning lige ved transformeren er det kun Z<sub>T</sub>, der begrænser strømmen, og den bliver ca. 25 gange mærkestrømmen. Et lavt u<sub>k</sub> giver et stift net med lille spændingsfald, men også store kortslutningsstrømme, som afbrydere og sikringer skal kunne bryde. Distributionstransformere op til ca. 630 kVA har typisk u<sub>k</sub> = 4 %, større ofte 6 %. Se også <button type="button" class="link" data-doc="doc-ik">Kortslutningsstrøm</button>.</p>
+    <p><b>R<sub>B</sub>, driftsjorden,</b> er modstanden fra transformerens stjernepunkt ned i jorden. Den holder stjernepunktet og dermed nullen tæt på jordens potentiale. Bogstaverne kommer fra tysk: B for Betriebserder (driftsjord) og A for Anlagenerder, installationens jordelektrode R<sub>A</sub>, som instrumentet og simulatoren kalder R<sub>E</sub>. I TT skal en jordfejl tilbage gennem R<sub>E</sub>, jorden og R<sub>B</sub>. Med R<sub>E</sub> = 50 Ω bliver fejlstrømmen kun ca. 230 V / 52 Ω ≈ 4,4 A, og derfor skal der bruges HPFI.</p>
+    <p><b>233 V i tomgang:</b> spændingen er sat lidt over 230 V, fordi den falder i transformer og kabler, når der kommer belastning på.</p>
     <h3>Ledningsfarver</h3>
     <p>L1 er brun, L2 sort og L3 grå. N er blå, og PE er grøn/gul. En PEN-leder er grøn/gul med blå markering i enderne (eller blå med grøn/gul markering). Diagrammet bruger de samme farver på lederne i kablerne.</p>`],
 
@@ -464,7 +470,8 @@ const SECTIONS = [
       <dt>Overgangsmodstand</dt><dd>Modstanden i en samling eller klemme. En dårlig samling har høj overgangsmodstand og bliver varm.</dd>
       <dt>Lokal nulling</dt><dd>PEN fortsætter op i stigeledningen, og PE forbindes til PEN i hver lejlighed.</dd>
       <dt>TN-C-S</dt><dd>Jordingssystem, hvor PEN deles i N og PE i hovedtavlen.</dd>
-      <dt>R<sub>B</sub></dt><dd>Driftsjord ved transformerens stjernepunkt.</dd>
+      <dt>u<sub>k</sub>, kortslutningsspænding</dt><dd>Den spænding i procent af mærkespændingen, der driver mærkestrøm gennem transformeren, når den anden vikling er kortsluttet. Et mål for transformerens indre impedans. Ik ved klemmerne ≈ I<sub>n</sub> / u<sub>k</sub>.</dd>
+      <dt>R<sub>B</sub></dt><dd>Driftsjord: modstanden fra transformerens stjernepunkt til jord.</dd>
       <dt>R<sub>E</sub> (R<sub>A</sub>)</dt><dd>Installationens jordelektrode.</dd>
       <dt>Z<sub>line</sub></dt><dd>Impedansen i sløjfen fase–nul.</dd>
       <dt>Z<sub>loop</sub> / Z<sub>s</sub></dt><dd>Impedansen i fejlsløjfen fase–PE.</dd>
