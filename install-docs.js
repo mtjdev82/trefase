@@ -138,7 +138,7 @@ const SECTIONS = [
       <dt>Fordelingskabel</dt><dd>Firelederkabel (L1, L2, L3 og PEN) i aluminium fra transformeren ud gennem kabelskabene. Kablet til det næste kabelskab forsynes gennem det forrige, så en fejl tidligt i kæden rammer alle længere ude.</dd>
       <dt>Kabelskab</dt><dd>Fordelingspunkt i vejen, hvor stikledningerne til bygningerne er tilsluttet.</dd>
       <dt>Stikledning</dt><dd>Kablet fra kabelskabet til bygningens hovedtavle. I TN-C-S er fjerde leder en PEN-leder, i TT en nulleder.</dd>
-      <dt>Hovedtavle</dt><dd>Bygningens første tavle med hovedjordklemmen, hvor PE fra jordelektroden samles. I TN-C-S deles PEN her i N og PE.</dd>
+      <dt>Hovedtavle</dt><dd>Bygningens første tavle med hovedjordklemmen. Her samles PE, ledningen til jordelektroden R<sub>E</sub> og potentialudligningen til fx vand- og varmerør. I TN-C-S deles PEN her i N og PE, så PEN også bliver forbundet til jordelektroden.</dd>
       <dt>Stigeledning / hovedledning</dt><dd>Kablet fra hovedtavlen op i opgangen til lejlighedernes undertavler. Én stigeledning kan forsyne flere lejligheder over hinanden. Den kan have en, to eller tre faser, nul og enten en separat PE eller en PEN (lokal nulling).</dd>
       <dt>Undertavle / gruppetavle</dt><dd>Tavlen i lejligheden med gruppeafbrydere og HPFI.</dd>
       <dt>Gruppe og gruppeledning</dt><dd>En gruppe er en strømkreds med egen gruppeafbryder, fx "Køkken". Gruppeledningen går fra tavlen til stikkontakter og faste udtag.</dd>
@@ -160,6 +160,7 @@ const SECTIONS = [
     </div>
     <h3>TN-C-S</h3>
     <p>Fejlstrømmen løber tilbage gennem PE og PEN til transformeren. Sløjfen består kun af metal, så strømmen bliver flere hundrede ampere, og gruppeafbryderen udløser momentant. Kravet er, at Z<sub>s</sub> er lille nok (se Z loop).</p>
+    <p>Hovedjordklemmen er forbundet både til PEN og til bygningens jordelektrode R<sub>E</sub>. PEN er altså jordet i begge ender: med R<sub>B</sub> ved transformeren og med R<sub>E</sub> ved bygningen. I Danmark har installationen normalt sin egen jordelektrode, også i TN-C-S. Ved en fejl løber næsten hele strømmen alligevel i metallet, fordi PEN kun er en brøkdel af en ohm, mens vejen gennem R<sub>E</sub>, jorden og R<sub>B</sub> er mange ohm. R<sub>E</sub> får først betydning, når PEN brydes.</p>
     <p>Svagheden er PEN-lederen. Brydes den før hovedtavlen, flyder nul, og fordi PE er forbundet med nul, får PE og alle udsatte dele spænding mod jord. Kun jordelektroden R<sub>E</sub> holder igen. Hverken gruppeafbryder eller HPFI reagerer, fordi der ikke løber nogen fejlstrøm.</p>
     <h3>TT</h3>
     <p>PE er kun forbundet til bygningens egen jordelektrode. Fejlstrømmen skal gennem R<sub>E</sub>, jorden og R<sub>B</sub>, så den bliver typisk få ampere. Det er for lidt til gruppeafbryderen, så beskyttelsen sker med HPFI. Kravet er R<sub>E</sub> · I<sub>ΔN</sub> ≤ 50 V, altså højst ca. 1667 Ω ved 30 mA.</p>
